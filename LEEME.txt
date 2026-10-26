@@ -1,0 +1,9 @@
+Compilar Tailwind (una sola vez, requiere Node.js instalado):
+
+  npm install -D tailwindcss@3
+  npx tailwindcss -i input.css -o tailwind.css --minify
+
+Esto crea tailwind.css junto al HTML. Abre laboratorio_3d_hidrostatica.html
+y ya no aparecera la advertencia del CDN.
+Mantén los dos archivos (HTML y tailwind.css) en la misma carpeta.
+Si cambias clases de Tailwind en el HTML, vuelve a ejecutar el segundo comando.

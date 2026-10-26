@@ -1,0 +1,1769 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Laboratorio Virtual 3D - Mecánica de Fluidos</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+
+    <style>
+        * { font-family: 'Inter', sans-serif; user-select: none; }
+        body, html { margin: 0; padding: 0; width: 100%; height: 100%; overflow: hidden; background-color: #0d1117; color: #f0f6fc; }
+        #webgl-container { width: 100%; height: 100%; position: absolute; top: 0; left: 0; z-index: 1; }
+        .glass-panel { background: rgba(15, 23, 42, 0.78); backdrop-filter: blur(16px); -webkit-backdrop-filter: blur(16px); border: 1px solid rgba(255,255,255,0.12); box-shadow: 0 20px 50px rgba(0,0,0,0.5); }
+        .glass-card { background: rgba(30, 41, 59, 0.6); backdrop-filter: blur(8px); border: 1px solid rgba(255,255,255,0.08); }
+        ::-webkit-scrollbar { width: 6px; height: 6px; }
+        ::-webkit-scrollbar-track { background: rgba(15,23,42,0.6); }
+        ::-webkit-scrollbar-thumb { background: rgba(59,130,246,0.5); border-radius: 3px; }
+        input, select, button { user-select: auto; }
+        #toast { transition: opacity .3s, transform .3s; }
+    </style>
+
+    <!-- Three.js -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <!-- Exportación: Excel (SheetJS) y PDF (jsPDF + AutoTable) -->
+    <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.8.2/jspdf.plugin.autotable.min.js"></script>
+</head>
+<body class="relative min-h-screen">
+
+    <div id="webgl-container"></div>
+
+    <!-- Notificaciones -->
+    <div id="toast" class="fixed bottom-6 left-1/2 -translate-x-1/2 z-[70] opacity-0 pointer-events-none px-4 py-2.5 rounded-xl text-xs font-semibold text-white bg-slate-800 border border-slate-600 shadow-2xl max-w-[90vw] text-center"></div>
+
+    <!-- ==========================================
+         MODAL 1: PERFIL DE ESTUDIANTE (persistente)
+         ========================================== -->
+    <div id="student-modal" class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-md">
+        <div class="glass-panel w-full max-w-md rounded-2xl p-6 border border-slate-700/50 max-h-[95vh] overflow-y-auto">
+            <div class="text-center mb-5">
+                <div class="inline-flex items-center justify-center w-16 h-16 rounded-2xl bg-blue-600/20 text-blue-400 mb-3 border border-blue-500/30">
+                    <i class="fa-solid fa-flask text-3xl"></i>
+                </div>
+                <h2 class="text-2xl font-bold text-white tracking-wide">Laboratorio de Mecánica de Fluidos</h2>
+                <p class="text-sm text-slate-400 mt-1">Tanque hidrostático 3D · P = P₀ + ρ·g·h en distintos planetas</p>
+            </div>
+
+            <div id="saved-profiles" class="hidden mb-4">
+                <div class="text-[11px] font-semibold text-slate-400 uppercase tracking-wider mb-1.5"><i class="fa-solid fa-clock-rotate-left mr-1"></i>Perfiles guardados en este equipo</div>
+                <div id="saved-profiles-list" class="space-y-1.5 max-h-32 overflow-y-auto"></div>
+                <div class="flex items-center gap-2 my-3"><div class="flex-1 h-px bg-slate-700"></div><span class="text-[10px] text-slate-500 uppercase">o crear nuevo</span><div class="flex-1 h-px bg-slate-700"></div></div>
+            </div>
+
+            <form id="student-form" class="space-y-4" onsubmit="event.preventDefault(); startSimulation();">
+                <div>
+                    <label class="block text-xs font-semibold text-slate-300 uppercase tracking-wider mb-1">Nombre Completo del Estudiante</label>
+                    <div class="relative">
+                        <i class="fa-solid fa-user absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-sm"></i>
+                        <input type="text" id="input-student-name" required placeholder="Ej. Carlos Mendoza Reyes"
+                            class="w-full bg-slate-900/80 border border-slate-700 rounded-xl py-2.5 pl-9 pr-3 text-sm text-white placeholder-slate-500 focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 transition">
+                    </div>
+                </div>
+                <div class="grid grid-cols-2 gap-3">
+                    <div>
+                        <label class="block text-xs font-semibold text-slate-300 uppercase tracking-wider mb-1">Código</label>
+                        <div class="relative">
+                            <i class="fa-solid fa-id-card absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-sm"></i>
+                            <input type="text" id="input-student-code" required placeholder="U202610482"
+                                class="w-full bg-slate-900/80 border border-slate-700 rounded-xl py-2.5 pl-9 pr-3 text-sm text-white placeholder-slate-500 focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 transition">
+                        </div>
+                    </div>
+                    <div>
+                        <label class="block text-xs font-semibold text-slate-300 uppercase tracking-wider mb-1">Sección / Grupo</label>
+                        <div class="relative">
+                            <i class="fa-solid fa-graduation-cap absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-sm"></i>
+                            <input type="text" id="input-student-section" required placeholder="CX41-01"
+                                class="w-full bg-slate-900/80 border border-slate-700 rounded-xl py-2.5 pl-9 pr-3 text-sm text-white placeholder-slate-500 focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 transition">
+                        </div>
+                    </div>
+                </div>
+                <div>
+                    <label class="block text-xs font-semibold text-slate-300 uppercase tracking-wider mb-1">Asignatura</label>
+                    <input type="text" id="input-course" value="Mecánica de Fluidos y Física Aplicada" readonly
+                        class="w-full bg-slate-900/40 border border-slate-800 rounded-xl py-2 px-3 text-xs text-slate-400 cursor-not-allowed">
+                </div>
+                <button type="submit" class="w-full mt-2 py-3 px-4 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 text-white font-semibold rounded-xl shadow-lg shadow-blue-600/30 transition flex items-center justify-center gap-2">
+                    <i class="fa-solid fa-door-open"></i><span>Ingresar al Laboratorio 3D</span>
+                </button>
+                <p class="text-[10px] text-slate-500 text-center">Tus lecturas se guardan automáticamente en este navegador y se recuperan al ingresar con el mismo código.</p>
+            </form>
+        </div>
+    </div>
+
+    <!-- ==========================================
+         HUD
+         ========================================== -->
+    <div id="hud-interface" class="hidden relative z-10 pointer-events-none w-full h-full flex flex-col justify-between p-4 md:p-6">
+
+        <header class="flex flex-wrap items-center justify-between gap-3 pointer-events-auto">
+            <div class="glass-panel px-4 py-2.5 rounded-2xl flex items-center gap-3">
+                <div class="w-10 h-10 rounded-xl bg-blue-600/20 border border-blue-500/40 flex items-center justify-center text-blue-400">
+                    <i class="fa-solid fa-atom text-xl"></i>
+                </div>
+                <div>
+                    <h1 class="text-sm font-bold text-white leading-tight">LABORATORIO VIRTUAL 3D</h1>
+                    <p id="hud-student-info" class="text-xs text-slate-400">Estudiante: ...</p>
+                </div>
+                <button onclick="changeProfile()" title="Cambiar de perfil" class="ml-1 w-8 h-8 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 flex items-center justify-center"><i class="fa-solid fa-right-from-bracket text-xs"></i></button>
+            </div>
+
+            <div class="glass-panel p-1.5 rounded-2xl flex items-center gap-1">
+                <button onclick="setCameraPreset('general')" class="px-3 py-1.5 rounded-xl text-xs font-medium text-slate-300 hover:text-white hover:bg-slate-800/80 transition flex items-center gap-1.5"><i class="fa-solid fa-border-all text-blue-400"></i><span class="hidden sm:inline">Vista General</span></button>
+                <button onclick="setCameraPreset('tank')" class="px-3 py-1.5 rounded-xl text-xs font-medium text-slate-300 hover:text-white hover:bg-slate-800/80 transition flex items-center gap-1.5"><i class="fa-solid fa-faucet-drip text-cyan-400"></i><span class="hidden sm:inline">Tanque</span></button>
+                <button onclick="setCameraPreset('desk')" class="px-3 py-1.5 rounded-xl text-xs font-medium text-slate-300 hover:text-white hover:bg-slate-800/80 transition flex items-center gap-1.5"><i class="fa-solid fa-chart-line text-emerald-400"></i><span class="hidden sm:inline">Mesa de Gráficas</span></button>
+                <button onclick="setCameraPreset('window')" class="px-3 py-1.5 rounded-xl text-xs font-medium text-slate-300 hover:text-white hover:bg-slate-800/80 transition flex items-center gap-1.5"><i class="fa-solid fa-globe text-amber-400"></i><span class="hidden sm:inline">Ventanal</span></button>
+            </div>
+        </header>
+
+        <div class="flex justify-between items-end gap-4 w-full">
+            <div class="glass-panel p-3.5 rounded-2xl max-w-xs pointer-events-auto hidden md:block">
+                <div class="text-xs font-semibold text-slate-300 flex items-center gap-2 mb-2"><i class="fa-solid fa-circle-info text-blue-400"></i><span>Controles 3D</span></div>
+                <ul class="text-[11px] text-slate-400 space-y-1">
+                    <li><i class="fa-solid fa-keyboard text-emerald-500 w-4"></i> <b class="text-emerald-400">W A S D</b> (o flechas): caminar</li>
+                    <li><i class="fa-solid fa-bolt text-slate-500 w-4"></i> <b>Shift</b>: correr</li>
+                    <li><i class="fa-solid fa-mouse text-slate-500 w-4"></i> Arrastrar con el mouse: mirar</li>
+                    <li><i class="fa-solid fa-magnifying-glass text-slate-500 w-4"></i> Rueda: acercar / alejar</li>
+                    <li><i class="fa-solid fa-computer-mouse text-emerald-500 w-4"></i> Clic en el <b class="text-emerald-400">monitor</b>: acercarse / ampliar gráficas</li>
+                    <li><i class="fa-solid fa-circle-dot text-rose-500 w-4"></i> Clic en el <b class="text-rose-400">botón verde</b> de la mesa: genera Excel + PDF</li>
+                </ul>
+            </div>
+
+            <div class="glass-panel p-5 rounded-2xl max-w-md w-full pointer-events-auto space-y-3.5 max-h-[calc(100vh-150px)] overflow-y-auto">
+                <div class="flex items-center justify-between border-b border-slate-700/60 pb-3">
+                    <div class="flex items-center gap-2"><i class="fa-solid fa-sliders text-blue-400"></i><h2 class="text-sm font-bold text-white">Consola de Control Hidrostático</h2></div>
+                    <span class="px-2 py-0.5 rounded text-[10px] font-bold bg-blue-500/20 text-blue-400 border border-blue-500/30">ACTIVO</span>
+                </div>
+
+                <div class="space-y-1">
+                    <label class="text-xs font-semibold text-slate-300 flex justify-between">
+                        <span>Planeta / Entorno (g):</span>
+                        <span><span id="label-gravity-val" class="text-amber-400 font-bold">9.81 m/s²</span> <span class="text-slate-500">·</span> <span class="text-slate-400">P₀ = </span><span id="label-p0-val" class="text-slate-200 font-bold">101.33 kPa</span></span>
+                    </label>
+                    <select id="select-planet" onchange="updatePlanetEnvironment()" class="w-full bg-slate-900 border border-slate-700 rounded-xl py-2 px-3 text-xs text-white focus:outline-none focus:border-blue-500">
+                        <option value="earth" selected>🌍 Tierra (g = 9.81 m/s²)</option>
+                        <option value="mars">🔴 Marte (g = 3.71 m/s²)</option>
+                        <option value="moon">🌕 Luna (g = 1.62 m/s²)</option>
+                        <option value="jupiter">🪐 Júpiter (g = 24.79 m/s²)</option>
+                        <option value="venus">🟡 Venus (g = 8.87 m/s²)</option>
+                    </select>
+                </div>
+
+                <div class="space-y-1">
+                    <label class="text-xs font-semibold text-slate-300 flex justify-between"><span>Fluido de trabajo:</span><span id="label-density-val" class="text-cyan-400 font-bold">1000 kg/m³</span></label>
+                    <select id="select-fluid" onchange="updateFluid()" class="w-full bg-slate-900 border border-slate-700 rounded-xl py-2 px-3 text-xs text-white focus:outline-none focus:border-blue-500">
+                        <option value="water" selected>💧 Agua pura (1000 kg/m³)</option>
+                        <option value="oil">🛢️ Aceite industrial (920 kg/m³)</option>
+                        <option value="glycerin">🧪 Glicerina (1260 kg/m³)</option>
+                        <option value="alcohol">🍷 Etanol (789 kg/m³)</option>
+                        <option value="mercury">🔘 Mercurio líquido (13600 kg/m³)</option>
+                    </select>
+                </div>
+
+                <div class="space-y-1">
+                    <div class="flex justify-between items-center text-xs">
+                        <span class="font-semibold text-slate-300">Profundidad de la sonda (h):</span>
+                        <span id="label-depth-val" class="text-emerald-400 font-mono font-bold text-sm">0.00 m</span>
+                    </div>
+                    <input type="range" id="slider-depth" min="0" max="3.3" step="0.05" value="0" oninput="updateProbeDepth()" class="w-full h-2 bg-slate-800 rounded-lg appearance-none cursor-pointer accent-blue-500">
+                </div>
+
+                <div class="grid grid-cols-2 gap-2">
+                    <div class="glass-card p-2.5 rounded-xl text-center">
+                        <div class="text-[10px] text-slate-400 uppercase tracking-wider">Presión manométrica</div>
+                        <div id="readout-gauge-p" class="text-lg font-bold text-emerald-400 font-mono mt-0.5">0.00 kPa</div>
+                    </div>
+                    <div class="glass-card p-2.5 rounded-xl text-center">
+                        <div class="text-[10px] text-slate-400 uppercase tracking-wider">Presión absoluta</div>
+                        <div id="readout-absolute-p" class="text-lg font-bold text-cyan-400 font-mono mt-0.5">101.33 kPa</div>
+                    </div>
+                </div>
+
+                <label class="flex items-center gap-2 text-[11px] text-slate-300 cursor-pointer">
+                    <input type="checkbox" id="chk-noise" checked class="accent-blue-500">
+                    <span>Ruido de sensor realista (la regresión no será perfecta)</span>
+                </label>
+
+                <div class="grid grid-cols-2 gap-2">
+                    <button onclick="recordDataPoint()" class="py-2.5 px-3 bg-blue-600 hover:bg-blue-500 text-white font-medium rounded-xl text-xs shadow-lg shadow-blue-600/20 transition flex items-center justify-center gap-1.5"><i class="fa-solid fa-plus-circle"></i><span>Registrar dato</span></button>
+                    <button id="btn-sweep" onclick="autoSweep()" class="py-2.5 px-3 bg-indigo-600 hover:bg-indigo-500 disabled:opacity-50 text-white font-medium rounded-xl text-xs shadow-lg shadow-indigo-600/20 transition flex items-center justify-center gap-1.5"><i class="fa-solid fa-arrows-down-to-line"></i><span>Barrido automático</span></button>
+                    <button onclick="openAnalysisModal()" class="py-2.5 px-3 bg-emerald-600 hover:bg-emerald-500 text-white font-medium rounded-xl text-xs shadow-lg shadow-emerald-600/20 transition flex items-center justify-center gap-1.5"><i class="fa-solid fa-chart-pie"></i><span>Gráfica &amp; análisis</span></button>
+                    <button onclick="exportReport()" class="py-2.5 px-3 bg-rose-600 hover:bg-rose-500 text-white font-medium rounded-xl text-xs shadow-lg shadow-rose-600/20 transition flex items-center justify-center gap-1.5"><i class="fa-solid fa-file-export"></i><span>Excel + PDF</span></button>
+                </div>
+                <div class="text-[10px] text-slate-500 text-center">Lecturas guardadas: <span id="hud-count" class="text-slate-300 font-bold">0</span></div>
+            </div>
+        </div>
+    </div>
+
+    <!-- ==========================================
+         MODAL 2: ANÁLISIS, REGRESIÓN & EXPORTACIÓN
+         ========================================== -->
+    <div id="analysis-modal" class="hidden fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/85 backdrop-blur-md">
+        <div class="glass-panel w-full max-w-5xl rounded-2xl p-6 border border-slate-700/60 max-h-[92vh] flex flex-col">
+            <div class="flex items-center justify-between pb-4 border-b border-slate-700/60">
+                <div class="flex items-center gap-3">
+                    <div class="w-10 h-10 rounded-xl bg-emerald-600/20 border border-emerald-500/30 flex items-center justify-center text-emerald-400"><i class="fa-solid fa-square-poll-vertical text-xl"></i></div>
+                    <div>
+                        <h3 class="text-lg font-bold text-white">Mesa de Análisis de Datos &amp; Informe</h3>
+                        <p class="text-xs text-slate-400">Regresión lineal P vs h por fluido y planeta · pendiente = ρ·g · intercepto = P₀</p>
+                    </div>
+                </div>
+                <button onclick="closeAnalysisModal()" class="w-8 h-8 rounded-lg bg-slate-800 text-slate-400 hover:text-white flex items-center justify-center"><i class="fa-solid fa-xmark"></i></button>
+            </div>
+
+            <div class="overflow-y-auto flex-1 my-4 pr-1 space-y-5">
+                <div class="grid grid-cols-1 lg:grid-cols-12 gap-5">
+                    <div class="lg:col-span-5 space-y-2">
+                        <div class="flex justify-between items-center">
+                            <h4 class="text-xs font-bold text-slate-200 uppercase tracking-wider">Lecturas tomadas</h4>
+                            <button onclick="clearRecordedData()" class="text-[11px] text-rose-400 hover:underline flex items-center gap-1"><i class="fa-solid fa-trash-can"></i> Limpiar todo</button>
+                        </div>
+                        <div class="border border-slate-700/60 rounded-xl max-h-72 overflow-y-auto">
+                            <table class="w-full text-left text-xs">
+                                <thead class="bg-slate-900/90 text-slate-400 border-b border-slate-700/60 sticky top-0">
+                                    <tr><th class="p-2 font-semibold">#</th><th class="p-2 font-semibold">Fluido · Planeta</th><th class="p-2 font-semibold">h (m)</th><th class="p-2 font-semibold">P man (kPa)</th><th class="p-2"></th></tr>
+                                </thead>
+                                <tbody id="table-data-body" class="divide-y divide-slate-800 text-slate-200 font-mono"></tbody>
+                            </table>
+                        </div>
+                    </div>
+
+                    <div class="lg:col-span-7 space-y-2">
+                        <div class="flex justify-between items-center">
+                            <h4 class="text-xs font-bold text-slate-200 uppercase tracking-wider">Ajuste lineal P vs h</h4>
+                            <div class="flex gap-1 text-[11px]">
+                                <button id="mode-abs" onclick="setChartMode('abs')" class="px-2.5 py-1 rounded-lg bg-blue-600 text-white">P absoluta</button>
+                                <button id="mode-gauge" onclick="setChartMode('gauge')" class="px-2.5 py-1 rounded-lg bg-slate-800 text-slate-300">P manométrica</button>
+                            </div>
+                        </div>
+                        <div class="glass-card p-2 rounded-xl border border-slate-700/60 h-72 relative">
+                            <canvas id="regressionCanvas" class="w-full h-full block"></canvas>
+                        </div>
+                    </div>
+                </div>
+
+                <div>
+                    <h4 class="text-xs font-bold text-slate-200 uppercase tracking-wider mb-2">Resultados de la regresión y comparación de pendientes ρ·g</h4>
+                    <div class="border border-slate-700/60 rounded-xl overflow-x-auto">
+                        <table class="w-full text-xs text-left min-w-[760px]">
+                            <thead class="bg-slate-900/90 text-slate-400 border-b border-slate-700/60">
+                                <tr>
+                                    <th class="p-2.5">Fluido · Planeta</th><th class="p-2.5">n</th>
+                                    <th class="p-2.5">Pend. exp. (Pa/m)</th><th class="p-2.5">ρ·g teórica (Pa/m)</th>
+                                    <th class="p-2.5">ρ exp. (kg/m³)</th><th class="p-2.5">Error ρ (%)</th>
+                                    <th class="p-2.5">P₀ exp. (kPa)</th><th class="p-2.5">R²</th>
+                                </tr>
+                            </thead>
+                            <tbody id="table-results-body" class="divide-y divide-slate-800 font-mono text-slate-200"></tbody>
+                        </table>
+                    </div>
+                    <p class="text-[11px] text-slate-500 mt-2">Se necesitan al menos 2 lecturas con profundidades distintas por combinación fluido/planeta para ajustar la recta.</p>
+                </div>
+            </div>
+
+            <div class="flex flex-wrap items-center justify-between gap-3 pt-3 border-t border-slate-700/60">
+                <span class="text-xs text-slate-400">El informe incluye datos, regresiones, gráfica y conclusiones.</span>
+                <div class="flex gap-2 flex-wrap">
+                    <button onclick="exportExcel()" class="py-2.5 px-4 bg-slate-800 hover:bg-slate-700 text-slate-200 font-semibold rounded-xl text-xs transition flex items-center gap-2 border border-slate-700"><i class="fa-solid fa-file-excel text-emerald-500"></i><span>Excel (.xlsx)</span></button>
+                    <button onclick="exportPDF()" class="py-2.5 px-4 bg-slate-800 hover:bg-slate-700 text-slate-200 font-semibold rounded-xl text-xs transition flex items-center gap-2 border border-slate-700"><i class="fa-solid fa-file-pdf text-rose-400"></i><span>PDF</span></button>
+                    <button onclick="exportReport()" class="py-2.5 px-4 bg-blue-600 hover:bg-blue-500 text-white font-semibold rounded-xl text-xs shadow-lg shadow-blue-600/30 transition flex items-center gap-2"><i class="fa-solid fa-file-export"></i><span>Generar ambos</span></button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+    // =====================================================
+    // DATOS BASE
+    // =====================================================
+    // p0 = presión de referencia sobre la superficie del fluido (kPa). Editable.
+    const PLANETS = {
+        earth:   { name: "Tierra",  g: 9.81,  p0: 101.325, note: "Atmósfera estándar a nivel del mar" },
+        mars:    { name: "Marte",   g: 3.71,  p0: 0.636,   note: "Atmósfera muy tenue" },
+        moon:    { name: "Luna",    g: 1.62,  p0: 0.0,     note: "Sin atmósfera (vacío)" },
+        jupiter: { name: "Júpiter", g: 24.79, p0: 100.0,   note: "Nivel de 1 bar en las nubes (planeta gaseoso)" },
+        venus:   { name: "Venus",   g: 8.87,  p0: 9200.0,  note: "Atmósfera densa (≈92 bar en superficie)" }
+    };
+    const FLUIDS = {
+        water:    { name: "Agua pura",         density: 1000,  color: 0x00aaff, opacity: 0.65 },
+        oil:      { name: "Aceite industrial", density: 920,   color: 0xdda011, opacity: 0.8 },
+        glycerin: { name: "Glicerina",         density: 1260,  color: 0xe2e8f0, opacity: 0.75 },
+        alcohol:  { name: "Etanol",            density: 789,   color: 0x38bdf8, opacity: 0.5 },
+        mercury:  { name: "Mercurio",          density: 13600, color: 0x94a3b8, opacity: 0.95 }
+    };
+    // Apariencia del exterior visto por el ventanal
+    const SCENERY = {
+        earth:   { top:'#1f63c9', horizon:'#bfe3ff', ground:'#4f7f3a', speck:'#3a6a2b', rocks:true,  rockColor:0x77746c, sun:true, stars:false, haze:0xbfe3ff },
+        moon:    { top:'#000000', horizon:'#0b0b0e', ground:'#8b8d92', speck:'#6c6e73', rocks:true,  rockColor:0x6b6d72, sun:true, stars:true,  earth:true, haze:0x050507 },
+        mars:    { top:'#8a5a3c', horizon:'#e2a97c', ground:'#a64b2a', speck:'#7b3318', rocks:true,  rockColor:0x7a3a22, sun:true, stars:false, haze:0xe2a97c },
+        jupiter: { top:'#6d4f33', horizon:'#ebcfa3', ground:'#d9b38c', speck:'#b5683f', rocks:false, bands:true, sun:false, stars:false, haze:0xebcfa3 },
+        venus:   { top:'#8d5f18', horizon:'#ebc769', ground:'#7a4e22', speck:'#573614', rocks:true,  rockColor:0x5a3a1b, sun:false, stars:false, haze:0xebc769 }
+    };
+    const PALETTE = ['#38bdf8','#f59e0b','#10b981','#f43f5e','#a78bfa','#facc15','#fb923c','#2dd4bf'];
+    const P_ATM_NOTE = 'P = P0 + rho*g*h';
+    const STORAGE_KEY = 'labfluidos3d_profiles_v1';
+    const TANK_SURFACE_Y = 3.5;   // altura de la superficie dentro del grupo del tanque
+    const PROBE_TOP_Y = 4.0;      // altura de la viga de la sonda
+
+    let studentProfile = { name: "", code: "", section: "", course: "Mecánica de Fluidos y Física Aplicada" };
+    let currentPlanetKey = 'earth';
+    let currentFluidKey = 'water';
+    let currentProbeDepth = 0.0;
+    let recordedData = [];       // {h, pAbsKPa, pGaugeKPa, planetKey, fluidKey, ts}
+    let chartMode = 'abs';       // 'abs' | 'gauge'
+    let currentPreset = 'general';
+    let sweeping = false;
+
+    // Three.js
+    let scene, camera, renderer, controls;
+    let fluidMesh, probeMesh, cableMesh, outsideGroup;
+    let probeTargetY = TANK_SURFACE_Y;
+    let gaugePanel, gaugeMesh, signPanel, monitorPanel, monitorTex;
+    let btnMesh, btnMat;
+    let interactives = [];
+    let hovered = null;
+
+    const $ = id => document.getElementById(id);
+    const sleep = ms => new Promise(r => setTimeout(r, ms));
+
+    // =====================================================
+    // UTILIDADES UI
+    // =====================================================
+    let toastTimer = null;
+    function showToast(msg, kind) {
+        const t = $('toast');
+        t.textContent = msg;
+        t.className = t.className.replace(/border-\S+/g, '').replace(/bg-\S+/g, '');
+        t.classList.add(kind === 'error' ? 'bg-rose-700' : kind === 'ok' ? 'bg-emerald-700' : 'bg-slate-800');
+        t.style.opacity = 1; t.style.transform = 'translate(-50%, 0)';
+        clearTimeout(toastTimer);
+        toastTimer = setTimeout(() => { t.style.opacity = 0; }, 2800);
+    }
+
+    // =====================================================
+    // PERFILES (persistentes en localStorage)
+    // =====================================================
+    function loadProfiles() { try { return JSON.parse(localStorage.getItem(STORAGE_KEY)) || {}; } catch (e) { return {}; } }
+    function saveProfiles(p) { try { localStorage.setItem(STORAGE_KEY, JSON.stringify(p)); } catch (e) {} }
+    function persist() {
+        if (!studentProfile.code) return;
+        const all = loadProfiles();
+        all[studentProfile.code] = { name: studentProfile.name, code: studentProfile.code, section: studentProfile.section, data: recordedData, updated: Date.now() };
+        saveProfiles(all);
+    }
+    function renderSavedProfiles() {
+        const all = loadProfiles();
+        const list = Object.values(all).sort((a, b) => (b.updated || 0) - (a.updated || 0));
+        const box = $('saved-profiles'), cont = $('saved-profiles-list');
+        cont.innerHTML = '';
+        if (!list.length) { box.classList.add('hidden'); return; }
+        box.classList.remove('hidden');
+        list.forEach(p => {
+            const b = document.createElement('button');
+            b.type = 'button';
+            b.className = 'w-full text-left px-3 py-2 rounded-xl bg-slate-900/70 hover:bg-slate-800 border border-slate-700 flex items-center justify-between gap-2 transition';
+            const left = document.createElement('div');
+            const n = document.createElement('div'); n.className = 'text-xs font-semibold text-white'; n.textContent = p.name;
+            const s = document.createElement('div'); s.className = 'text-[10px] text-slate-400'; s.textContent = `${p.code} · ${p.section} · ${(p.data || []).length} lecturas`;
+            left.appendChild(n); left.appendChild(s);
+            const ic = document.createElement('i'); ic.className = 'fa-solid fa-arrow-right-to-bracket text-blue-400 text-xs';
+            b.appendChild(left); b.appendChild(ic);
+            b.onclick = () => {
+                $('input-student-name').value = p.name; $('input-student-code').value = p.code; $('input-student-section').value = p.section;
+                startSimulation();
+            };
+            cont.appendChild(b);
+        });
+    }
+    renderSavedProfiles();
+
+    function startSimulation() {
+        const name = $('input-student-name').value.trim();
+        const code = $('input-student-code').value.trim();
+        const section = $('input-student-section').value.trim();
+        if (!name || !code || !section) return;
+
+        studentProfile.name = name; studentProfile.code = code; studentProfile.section = section;
+        const existing = loadProfiles()[code];
+        recordedData = existing && Array.isArray(existing.data) ? existing.data : [];
+        persist();
+
+        $('student-modal').classList.add('hidden');
+        if (document.activeElement && document.activeElement.blur) document.activeElement.blur();
+        $('hud-interface').classList.remove('hidden');
+        $('hud-student-info').innerText = `${name} (${code}) · Sec: ${section}`;
+
+        if (!scene) initThreeJS();
+        updatePlanetEnvironment(true);
+        updateCalculations();
+        refreshMonitor();
+        $('hud-count').innerText = recordedData.length;
+        showToast(existing ? `Perfil recuperado: ${recordedData.length} lecturas guardadas` : 'Perfil creado correctamente', 'ok');
+    }
+
+    function changeProfile() {
+        persist();
+        closeAnalysisModal();
+        $('hud-interface').classList.add('hidden');
+        $('student-modal').classList.remove('hidden');
+        renderSavedProfiles();
+    }
+
+    // =====================================================
+    // TEXTURAS DE CANVAS
+    // =====================================================
+    function makePanel(w, h, drawFn) {
+        const canvas = document.createElement('canvas'); canvas.width = w; canvas.height = h;
+        const ctx = canvas.getContext('2d');
+        drawFn(ctx, w, h);
+        const tex = new THREE.CanvasTexture(canvas);
+        tex.anisotropy = 4;
+        return { canvas, ctx, tex, w, h };
+    }
+    function roundRect(ctx, x, y, w, h, r) {
+        ctx.beginPath(); ctx.moveTo(x + r, y);
+        ctx.arcTo(x + w, y, x + w, y + h, r); ctx.arcTo(x + w, y + h, x, y + h, r);
+        ctx.arcTo(x, y + h, x, y, r); ctx.arcTo(x, y, x + w, y, r); ctx.closePath();
+    }
+
+    // =====================================================
+    // ESCENA 3D
+    // =====================================================
+    function initThreeJS() {
+        const container = $('webgl-container');
+        scene = new THREE.Scene();
+        scene.background = new THREE.Color(0x0a0e17);
+
+        camera = new THREE.PerspectiveCamera(45, window.innerWidth / window.innerHeight, 0.1, 1500);
+        camera.position.set(0, 3.5, 9);
+
+        renderer = new THREE.WebGLRenderer({ antialias: true, powerPreference: "high-performance" });
+        renderer.setSize(window.innerWidth, window.innerHeight);
+        renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+        renderer.shadowMap.enabled = true;
+        renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+        renderer.toneMapping = THREE.ACESFilmicToneMapping;
+        container.appendChild(renderer.domElement);
+
+        initPlayer();
+
+        scene.add(new THREE.HemisphereLight(0xffffff, 0xc9d3de, 0.85));
+        const mainLight = new THREE.DirectionalLight(0xffffff, 0.7);
+        mainLight.position.set(4, 7.5, 6);
+        mainLight.castShadow = true;
+        mainLight.shadow.mapSize.set(2048, 2048);
+        mainLight.shadow.camera.left = -14; mainLight.shadow.camera.right = 14;
+        mainLight.shadow.camera.top = 14; mainLight.shadow.camera.bottom = -14;
+        mainLight.shadow.bias = -0.0005;
+        scene.add(mainLight);
+        [[-6, -3], [6, -3], [-6, 5], [6, 5]].forEach(p => { const l = new THREE.PointLight(0xeaf3ff, 0.5, 16); l.position.set(p[0], 7.2, p[1]); scene.add(l); });
+        renderer.toneMappingExposure = 1.15;
+
+        buildLaboratoryRoom();
+        outsideGroup = new THREE.Group(); scene.add(outsideGroup);
+        buildOutside(currentPlanetKey);
+        setupPointerInteraction();
+
+        window.addEventListener('resize', onWindowResize);
+        animate();
+    }
+
+    function buildLaboratoryRoom() {
+        const floorMat = new THREE.MeshStandardMaterial({ color: 0xe2e8f0, roughness: 0.25, metalness: 0.1 });
+        const wallMat = new THREE.MeshStandardMaterial({ color: 0xf1f5f9, roughness: 0.6 });
+        const darkMat = new THREE.MeshStandardMaterial({ color: 0x0f172a, roughness: 0.3 });
+        const deskTopMat = new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 0.15 });
+        const metalMat = new THREE.MeshStandardMaterial({ color: 0x94a3b8, metalness: 0.25, roughness: 0.45 });
+
+        buildRoomShellAndMaterials();
+
+        // Letrero del planeta sobre el ventanal
+        signPanel = makePanel(1024, 180, () => {});
+        const sign = new THREE.Mesh(new THREE.PlaneGeometry(9, 1.58), new THREE.MeshBasicMaterial({ map: signPanel.tex, toneMapped: false }));
+        sign.position.set(0, 7.05, -9.77); scene.add(sign);
+
+        // ---------- MESA 1: TANQUE ----------
+        const desk1 = new THREE.Group();
+        const d1 = new THREE.Mesh(new THREE.BoxGeometry(5, 0.2, 3), deskTopMat);
+        d1.position.y = 1.1; d1.castShadow = true; d1.receiveShadow = true; desk1.add(d1);
+        for (const x of [-2.3, 2.3]) for (const z of [-1.3, 1.3]) {
+            const leg = new THREE.Mesh(new THREE.CylinderGeometry(0.08, 0.08, 1.1), metalMat); leg.position.set(x, 0.55, z); desk1.add(leg);
+        }
+        desk1.position.set(-4, 0, 0); scene.add(desk1);
+
+        const tankGroup = new THREE.Group();
+        const tankMesh = new THREE.Mesh(new THREE.CylinderGeometry(1.2, 1.2, 3.8, 40, 1, true),
+            new THREE.MeshStandardMaterial({ color: 0xffffff, transparent: true, opacity: 0.18, roughness: 0.05, side: THREE.DoubleSide, depthWrite: false }));
+        tankMesh.position.y = 1.9; tankGroup.add(tankMesh);
+        const tankBase = new THREE.Mesh(new THREE.CylinderGeometry(1.25, 1.25, 0.06, 40), metalMat);
+        tankBase.position.y = -0.03; tankGroup.add(tankBase);
+
+        fluidMesh = new THREE.Mesh(new THREE.CylinderGeometry(1.15, 1.15, 3.5, 40),
+            new THREE.MeshStandardMaterial({ color: FLUIDS.water.color, transparent: true, opacity: FLUIDS.water.opacity, roughness: 0.2 }));
+        fluidMesh.position.y = 1.75; tankGroup.add(fluidMesh);
+
+        // Regla graduada (0 m en la superficie, 3.5 m en el fondo)
+        const ruler = makePanel(128, 1024, (ctx, w, h) => {
+            ctx.fillStyle = '#f8fafc'; ctx.fillRect(0, 0, w, h);
+            ctx.fillStyle = '#0f172a'; ctx.strokeStyle = '#0f172a';
+            for (let i = 0; i <= 35; i++) {
+                const y = (i / 35) * (h - 4) + 2; const major = i % 5 === 0;
+                ctx.lineWidth = major ? 4 : 2;
+                ctx.beginPath(); ctx.moveTo(w, y); ctx.lineTo(w - (major ? 56 : 28), y); ctx.stroke();
+                if (major) { ctx.font = 'bold 30px Inter, sans-serif'; ctx.textAlign = 'left'; ctx.fillText((i / 10).toFixed(1), 6, Math.min(y + 11, h - 6)); }
+            }
+        });
+        const rulerMesh = new THREE.Mesh(new THREE.PlaneGeometry(0.5, 3.5), new THREE.MeshBasicMaterial({ map: ruler.tex, side: THREE.DoubleSide, toneMapped: false }));
+        rulerMesh.position.set(1.55, 1.75, 0); tankGroup.add(rulerMesh);
+        const rulerLabel = makePanel(256, 64, (ctx, w, h) => { ctx.fillStyle = 'rgba(15,23,42,0.85)'; roundRect(ctx, 2, 2, w - 4, h - 4, 12); ctx.fill(); ctx.fillStyle = '#e2e8f0'; ctx.font = 'bold 28px Inter, sans-serif'; ctx.textAlign = 'center'; ctx.fillText('h (m)', w / 2, 43); });
+        const rl = new THREE.Mesh(new THREE.PlaneGeometry(0.7, 0.18), new THREE.MeshBasicMaterial({ map: rulerLabel.tex, transparent: true, toneMapped: false }));
+        rl.position.set(1.55, 3.7, 0); tankGroup.add(rl);
+
+        // Pórtico de la sonda
+        const gantryMat = new THREE.MeshStandardMaterial({ color: 0x334155, metalness: 0.7, roughness: 0.3 });
+        const post = new THREE.Mesh(new THREE.BoxGeometry(0.14, 4.2, 0.14), gantryMat); post.position.set(0, 2.1, -1.4); tankGroup.add(post);
+        const arm = new THREE.Mesh(new THREE.BoxGeometry(0.14, 0.14, 1.5), gantryMat); arm.position.set(0, PROBE_TOP_Y + 0.07, -0.65); tankGroup.add(arm);
+
+        probeMesh = new THREE.Mesh(new THREE.CylinderGeometry(0.15, 0.15, 0.2, 20),
+            new THREE.MeshStandardMaterial({ color: 0xef4444, metalness: 0.9, roughness: 0.1 }));
+        probeMesh.position.set(0, TANK_SURFACE_Y, 0); tankGroup.add(probeMesh);
+        cableMesh = new THREE.Mesh(new THREE.CylinderGeometry(0.02, 0.02, 1), new THREE.MeshBasicMaterial({ color: 0x111111 }));
+        tankGroup.add(cableMesh);
+
+        tankGroup.position.set(-4, 1.2, 0); scene.add(tankGroup);
+
+        // Panel digital flotante sobre el tanque
+        gaugePanel = makePanel(768, 288, () => {});
+        gaugeMesh = new THREE.Mesh(new THREE.PlaneGeometry(3.4, 1.275), new THREE.MeshBasicMaterial({ map: gaugePanel.tex, transparent: true, toneMapped: false, side: THREE.DoubleSide }));
+        gaugeMesh.position.set(-4, 6.7, 0); scene.add(gaugeMesh);
+
+        // ---------- MESA 2: ESTACIÓN DE GRÁFICAS ----------
+        const desk2 = new THREE.Group();
+        const d2 = new THREE.Mesh(new THREE.BoxGeometry(5, 0.2, 3), deskTopMat);
+        d2.position.y = 1.1; d2.castShadow = true; d2.receiveShadow = true; desk2.add(d2);
+        for (const x of [-2.3, 2.3]) for (const z of [-1.3, 1.3]) {
+            const leg = new THREE.Mesh(new THREE.CylinderGeometry(0.08, 0.08, 1.1), metalMat); leg.position.set(x, 0.55, z); desk2.add(leg);
+        }
+        desk2.position.set(4, 0, 0); scene.add(desk2);
+
+        // Monitor con la gráfica real renderizada como textura
+        const pc = new THREE.Group();
+        const stand = new THREE.Mesh(new THREE.CylinderGeometry(0.1, 0.22, 0.5, 16), metalMat); stand.position.y = 0.25; pc.add(stand);
+        const neck = new THREE.Mesh(new THREE.BoxGeometry(0.12, 0.5, 0.08), metalMat); neck.position.set(0, 0.6, -0.05); pc.add(neck);
+        const bezel = new THREE.Mesh(new THREE.BoxGeometry(2.25, 1.35, 0.1), darkMat); bezel.position.set(0, 1.0, 0); bezel.castShadow = true; pc.add(bezel);
+        monitorPanel = makePanel(1024, 564, () => {});
+        monitorTex = monitorPanel.tex;
+        const screen = new THREE.Mesh(new THREE.PlaneGeometry(2.1, 1.157), new THREE.MeshBasicMaterial({ map: monitorTex, toneMapped: false }));
+        screen.position.set(0, 1.0, 0.055); screen.userData.action = 'monitor'; pc.add(screen);
+        const kb = new THREE.Mesh(new THREE.BoxGeometry(1.2, 0.04, 0.4), darkMat); kb.position.set(0, 0.02, 0.8); pc.add(kb);
+        pc.position.set(4.3, 1.2, -0.4); scene.add(pc);
+        interactives.push(screen);
+
+        // Consola con botón virtual de INFORME (Excel + PDF)
+        const cons = new THREE.Group();
+        const base = new THREE.Mesh(new THREE.BoxGeometry(1.1, 0.2, 0.9), darkMat); base.position.y = 0.1; base.castShadow = true; base.userData.action = 'report'; cons.add(base);
+        const ring = new THREE.Mesh(new THREE.TorusGeometry(0.32, 0.04, 12, 32), metalMat); ring.rotation.x = Math.PI / 2; ring.position.y = 0.21; cons.add(ring);
+        btnMat = new THREE.MeshStandardMaterial({ color: 0x16a34a, emissive: 0x15803d, emissiveIntensity: 0.7, roughness: 0.3 });
+        btnMesh = new THREE.Mesh(new THREE.CylinderGeometry(0.27, 0.27, 0.14, 32), btnMat);
+        btnMesh.position.y = 0.28; btnMesh.userData.action = 'report'; cons.add(btnMesh);
+        const stake = new THREE.Mesh(new THREE.BoxGeometry(0.05, 0.55, 0.05), metalMat); stake.position.set(0, 0.45, -0.35); cons.add(stake);
+        const lbl = makePanel(512, 192, (ctx, w, h) => {
+            ctx.fillStyle = '#0f172a'; roundRect(ctx, 4, 4, w - 8, h - 8, 22); ctx.fill();
+            ctx.strokeStyle = '#22c55e'; ctx.lineWidth = 6; ctx.stroke();
+            ctx.fillStyle = '#e2e8f0'; ctx.textAlign = 'center';
+            ctx.font = 'bold 50px Inter, sans-serif'; ctx.fillText('GENERAR INFORME', w / 2, 82);
+            ctx.fillStyle = '#4ade80'; ctx.font = 'bold 40px Inter, sans-serif'; ctx.fillText('Excel (.xlsx) + PDF', w / 2, 140);
+        });
+        const lblMesh = new THREE.Mesh(new THREE.PlaneGeometry(1.2, 0.45), new THREE.MeshBasicMaterial({ map: lbl.tex, toneMapped: false }));
+        lblMesh.position.set(0, 0.95, -0.35); lblMesh.userData.action = 'report'; cons.add(lblMesh);
+        cons.position.set(2.3, 1.2, 0.85); scene.add(cons);
+        interactives.push(base, btnMesh, lblMesh);
+
+        // Silla
+        const chair = new THREE.Group();
+        const seat = new THREE.Mesh(new THREE.CylinderGeometry(0.6, 0.6, 0.1, 20), darkMat); seat.position.y = 0.8; chair.add(seat);
+        const back = new THREE.Mesh(new THREE.BoxGeometry(1.0, 0.8, 0.1), darkMat); back.position.set(0, 1.25, 0.55); chair.add(back);
+        const cl = new THREE.Mesh(new THREE.CylinderGeometry(0.06, 0.06, 0.8), metalMat); cl.position.y = 0.4; chair.add(cl);
+        chair.position.set(4.3, 0, 2.2); scene.add(chair);
+        buildLabDecor();
+    }
+
+    // =====================================================
+    // EXTERIOR VISTO POR EL VENTANAL (superficie del planeta)
+    // =====================================================
+    function clearGroup(g) {
+        while (g.children.length) {
+            const c = g.children[0]; g.remove(c);
+            c.traverse(o => {
+                if (o.geometry) o.geometry.dispose();
+                if (o.material) { if (o.material.map) o.material.map.dispose(); o.material.dispose(); }
+            });
+        }
+    }
+    function groundTexture(sc) {
+        return makePanel(512, 512, (ctx, w, h) => {
+            ctx.fillStyle = sc.ground; ctx.fillRect(0, 0, w, h);
+            if (sc.bands) {
+                const cols = ['#d9b38c', '#b5683f', '#efe3cf', '#c28a5a', '#8f5a3a', '#e6c9a2'];
+                let y = 0;
+                while (y < h) { const bh = 18 + Math.random() * 50; ctx.fillStyle = cols[Math.floor(Math.random() * cols.length)]; ctx.fillRect(0, y, w, bh); y += bh; }
+                for (let i = 0; i < 40; i++) { ctx.fillStyle = `rgba(255,255,255,${Math.random() * 0.12})`; ctx.beginPath(); ctx.ellipse(Math.random() * w, Math.random() * h, 20 + Math.random() * 70, 4 + Math.random() * 10, 0, 0, Math.PI * 2); ctx.fill(); }
+            } else {
+                for (let i = 0; i < 5000; i++) { ctx.fillStyle = sc.speck; ctx.globalAlpha = Math.random() * 0.5; const s = 1 + Math.random() * 4; ctx.fillRect(Math.random() * w, Math.random() * h, s, s); }
+                ctx.globalAlpha = 1;
+            }
+        });
+    }
+    function buildOutside(key) {
+        const sc = SCENERY[key];
+        clearGroup(outsideGroup);
+
+        // Cielo: cúpula enorme que rodea todo (no se acaba al mirar de costado)
+        const sky = makePanel(8, 256, (ctx, w, h) => {
+            const g = ctx.createLinearGradient(0, 0, 0, h);
+            g.addColorStop(0, sc.top); g.addColorStop(0.5, sc.horizon); g.addColorStop(1, sc.horizon);
+            ctx.fillStyle = g; ctx.fillRect(0, 0, w, h);
+        });
+        const dome = new THREE.Mesh(new THREE.SphereGeometry(600, 32, 24), new THREE.MeshBasicMaterial({ map: sky.tex, side: THREE.BackSide, fog: false, toneMapped: false, depthWrite: false }));
+        dome.renderOrder = -10; outsideGroup.add(dome);
+        scene.background = new THREE.Color(sc.haze);
+
+        // Suelo: llanura enorme que se funde con el horizonte por la niebla
+        const gt = groundTexture(sc);
+        gt.tex.wrapS = gt.tex.wrapT = THREE.RepeatWrapping;
+        gt.tex.repeat.set(sc.bands ? 4 : 175, sc.bands ? 120 : 175);
+        const ground = new THREE.Mesh(new THREE.PlaneGeometry(1400, 1400), new THREE.MeshLambertMaterial({ map: gt.tex }));
+        ground.rotation.x = -Math.PI / 2; ground.position.set(0, -0.02, 0); outsideGroup.add(ground);
+
+        // Rocas
+        if (sc.rocks) {
+            const rm = new THREE.MeshLambertMaterial({ color: sc.rockColor });
+            for (let i = 0; i < 55; i++) {
+                const s = 0.3 + Math.random() * 1.6;
+                const r = new THREE.Mesh(new THREE.DodecahedronGeometry(1, 0), rm);
+                r.scale.set(s * (0.8 + Math.random()), s * (0.5 + Math.random() * 0.4), s * (0.8 + Math.random()));
+                r.position.set((Math.random() - 0.5) * 120, s * 0.25, -14 - Math.random() * 62);
+                r.rotation.y = Math.random() * 6; outsideGroup.add(r);
+            }
+        }
+        // Estrellas
+        if (sc.stars) {
+            const n = 900, pos = new Float32Array(n * 3);
+            for (let i = 0; i < n; i++) { pos[i * 3] = (Math.random() - 0.5) * 220; pos[i * 3 + 1] = 3 + Math.random() * 80; pos[i * 3 + 2] = -20 - Math.random() * 62; }
+            const geo = new THREE.BufferGeometry(); geo.setAttribute('position', new THREE.BufferAttribute(pos, 3));
+            outsideGroup.add(new THREE.Points(geo, new THREE.PointsMaterial({ color: 0xffffff, size: 0.3, fog: false })));
+        }
+        // Sol
+        if (sc.sun) {
+            const sun = new THREE.Mesh(new THREE.SphereGeometry(key === 'moon' ? 1.8 : 2.8, 24, 24), new THREE.MeshBasicMaterial({ color: 0xfff1b8, fog: false, toneMapped: false }));
+            sun.position.set(22, 22, -78); outsideGroup.add(sun);
+        }
+        // La Tierra en el cielo lunar
+        if (sc.earth) {
+            const et = makePanel(256, 128, (ctx, w, h) => {
+                ctx.fillStyle = '#2563c4'; ctx.fillRect(0, 0, w, h);
+                ctx.fillStyle = '#3f8f4e';
+                for (let i = 0; i < 14; i++) { ctx.beginPath(); ctx.ellipse(Math.random() * w, 15 + Math.random() * (h - 30), 12 + Math.random() * 28, 8 + Math.random() * 14, Math.random() * 3, 0, Math.PI * 2); ctx.fill(); }
+                ctx.fillStyle = 'rgba(255,255,255,0.55)';
+                for (let i = 0; i < 16; i++) { ctx.beginPath(); ctx.ellipse(Math.random() * w, Math.random() * h, 14 + Math.random() * 26, 3 + Math.random() * 6, 0, 0, Math.PI * 2); ctx.fill(); }
+            });
+            const earth = new THREE.Mesh(new THREE.SphereGeometry(5, 32, 32), new THREE.MeshBasicMaterial({ map: et.tex, fog: false, toneMapped: false }));
+            earth.position.set(-18, 20, -76); earth.userData.spin = true; outsideGroup.add(earth);
+        }
+
+        scene.fog = new THREE.Fog(sc.haze, 38, 130);
+        drawSign();
+    }
+    function drawSign() {
+        const p = PLANETS[currentPlanetKey];
+        const ctx = signPanel.ctx, w = signPanel.w, h = signPanel.h;
+        const fit = (txt, font, maxW, size) => { do { ctx.font = `${font} ${size}px Inter, Arial, sans-serif`; size -= 2; } while (ctx.measureText(txt).width > maxW && size > 12); };
+        ctx.clearRect(0, 0, w, h);
+        ctx.fillStyle = '#0f172a'; ctx.fillRect(0, 0, w, h);
+        ctx.strokeStyle = '#38bdf8'; ctx.lineWidth = 6; ctx.strokeRect(4, 4, w - 8, h - 8);
+        ctx.textAlign = 'center';
+        const t1 = `ESTACIÓN: ${p.name.toUpperCase()}`, t2 = `g = ${p.g} m/s²   ·   P₀ = ${p.p0} kPa`, t3 = p.note;
+        ctx.fillStyle = '#fbbf24'; fit(t1, 'bold', w - 80, 64); ctx.fillText(t1, w / 2, 68);
+        ctx.fillStyle = '#e2e8f0'; fit(t2, '600', w - 80, 38); ctx.fillText(t2, w / 2, 112);
+        ctx.fillStyle = '#94a3b8'; fit(t3, '400', w - 80, 30); ctx.fillText(t3, w / 2, 152);
+        signPanel.tex.needsUpdate = true;
+    }
+
+    // =====================================================
+    // CÁLCULOS HIDROSTÁTICOS EN TIEMPO REAL
+    // =====================================================
+    function updateCalculations() {
+        const planet = PLANETS[currentPlanetKey], fluid = FLUIDS[currentFluidKey];
+        const pGaugeKPa = fluid.density * planet.g * currentProbeDepth / 1000;
+        const pAbsKPa = planet.p0 + pGaugeKPa;
+        $('readout-gauge-p').innerText = `${pGaugeKPa.toFixed(2)} kPa`;
+        $('readout-absolute-p').innerText = `${pAbsKPa.toFixed(2)} kPa`;
+        probeTargetY = TANK_SURFACE_Y - currentProbeDepth;
+        drawGauge(pGaugeKPa, pAbsKPa);
+    }
+    function drawGauge(pg, pa) {
+        if (!gaugePanel) return;
+        const ctx = gaugePanel.ctx, w = gaugePanel.w, h = gaugePanel.h;
+        const planet = PLANETS[currentPlanetKey], fluid = FLUIDS[currentFluidKey];
+        ctx.clearRect(0, 0, w, h);
+        ctx.fillStyle = 'rgba(15,23,42,0.92)'; roundRect(ctx, 6, 6, w - 12, h - 12, 26); ctx.fill();
+        ctx.strokeStyle = '#38bdf8'; ctx.lineWidth = 4; ctx.stroke();
+        ctx.textAlign = 'left';
+        ctx.fillStyle = '#94a3b8'; ctx.font = '600 26px Inter, sans-serif';
+        ctx.fillText(`${fluid.name} · ${planet.name}  (ρ=${fluid.density}, g=${planet.g})`, 30, 52);
+        ctx.fillStyle = '#34d399'; ctx.font = 'bold 54px Inter, sans-serif';
+        ctx.fillText(`h = ${currentProbeDepth.toFixed(2)} m`, 30, 120);
+        ctx.fillStyle = '#e2e8f0'; ctx.font = 'bold 42px Inter, sans-serif';
+        ctx.fillText(`P man = ${pg.toFixed(2)} kPa`, 30, 184);
+        ctx.fillStyle = '#22d3ee';
+        ctx.fillText(`P abs = ${pa.toFixed(2)} kPa`, 30, 244);
+        gaugePanel.tex.needsUpdate = true;
+    }
+
+    function updatePlanetEnvironment(skipRebuild) {
+        currentPlanetKey = $('select-planet').value;
+        const planet = PLANETS[currentPlanetKey];
+        $('label-gravity-val').innerText = `${planet.g} m/s²`;
+        $('label-p0-val').innerText = `${planet.p0} kPa`;
+        if (scene) buildOutside(currentPlanetKey);
+        updateCalculations();
+    }
+    function updateFluid() {
+        currentFluidKey = $('select-fluid').value;
+        const fluid = FLUIDS[currentFluidKey];
+        $('label-density-val').innerText = `${fluid.density} kg/m³`;
+        if (fluidMesh) { fluidMesh.material.color.setHex(fluid.color); fluidMesh.material.opacity = fluid.opacity; }
+        drawSign();
+        updateCalculations();
+    }
+    function updateProbeDepth() {
+        currentProbeDepth = parseFloat($('slider-depth').value);
+        $('label-depth-val').innerText = `${currentProbeDepth.toFixed(2)} m`;
+        updateCalculations();
+    }
+
+    // =====================================================
+    // REGISTRO DE DATOS Y REGRESIÓN
+    // =====================================================
+    function gauss() { let u = 0, v = 0; while (!u) u = Math.random(); while (!v) v = Math.random(); return Math.sqrt(-2 * Math.log(u)) * Math.cos(2 * Math.PI * v); }
+
+    function recordDataPoint(silent) {
+        const planet = PLANETS[currentPlanetKey], fluid = FLUIDS[currentFluidKey];
+        const rghKPa = fluid.density * planet.g * currentProbeDepth / 1000;
+        const noise = $('chk-noise').checked ? gauss() * (0.15 + 0.004 * rghKPa) : 0;
+        const pAbs = Math.max(0, planet.p0 + rghKPa + noise);
+        recordedData.push({ h: currentProbeDepth, pAbsKPa: pAbs, pGaugeKPa: pAbs - planet.p0, planetKey: currentPlanetKey, fluidKey: currentFluidKey, ts: Date.now() });
+        onDataChanged();
+        if (silent !== true) showToast(`Dato #${recordedData.length}: h = ${currentProbeDepth.toFixed(2)} m → P = ${pAbs.toFixed(2)} kPa`, 'ok');
+    }
+    function removeRow(i) { recordedData.splice(i, 1); onDataChanged(); }
+    function clearRecordedData() {
+        if (recordedData.length && !confirm('¿Borrar todas las lecturas de este perfil?')) return;
+        recordedData = []; onDataChanged();
+    }
+    function onDataChanged() {
+        persist();
+        $('hud-count').innerText = recordedData.length;
+        refreshMonitor();
+        if (!$('analysis-modal').classList.contains('hidden')) refreshAnalysis();
+    }
+
+    async function autoSweep() {
+        if (sweeping) return;
+        sweeping = true; $('btn-sweep').disabled = true;
+        const depths = [0.4, 0.8, 1.2, 1.6, 2.0, 2.4, 2.8, 3.2];
+        for (const d of depths) {
+            $('slider-depth').value = d; updateProbeDepth();
+            await sleep(650);
+            recordDataPoint(true);
+        }
+        sweeping = false; $('btn-sweep').disabled = false;
+        showToast(`Barrido completado: ${depths.length} lecturas registradas`, 'ok');
+    }
+
+    function linreg(xs, ys) {
+        const n = xs.length;
+        if (n < 2) return { ok: false };
+        const sx = xs.reduce((a, b) => a + b, 0), sy = ys.reduce((a, b) => a + b, 0);
+        const sxx = xs.reduce((a, b) => a + b * b, 0), sxy = xs.reduce((a, x, i) => a + x * ys[i], 0);
+        const den = n * sxx - sx * sx;
+        if (Math.abs(den) < 1e-9) return { ok: false };
+        const slope = (n * sxy - sx * sy) / den, intercept = (sy - slope * sx) / n;
+        const my = sy / n;
+        const ssTot = ys.reduce((a, y) => a + (y - my) ** 2, 0);
+        const ssRes = ys.reduce((a, y, i) => a + (y - (slope * xs[i] + intercept)) ** 2, 0);
+        return { ok: true, slope, intercept, r2: ssTot < 1e-12 ? 1 : 1 - ssRes / ssTot };
+    }
+    function computeGroups() {
+        const map = {}, arr = [];
+        recordedData.forEach(d => {
+            const k = d.planetKey + '|' + d.fluidKey;
+            if (!map[k]) { map[k] = { key: k, planetKey: d.planetKey, fluidKey: d.fluidKey, pts: [], color: PALETTE[arr.length % PALETTE.length] }; arr.push(map[k]); }
+            map[k].pts.push(d);
+        });
+        arr.forEach(g => {
+            const pl = PLANETS[g.planetKey], fl = FLUIDS[g.fluidKey];
+            g.planet = pl; g.fluid = fl; g.label = `${fl.name} · ${pl.name}`; g.n = g.pts.length;
+            g.slopeTh = fl.density * pl.g;
+            Object.assign(g, linreg(g.pts.map(p => p.h), g.pts.map(p => p.pAbsKPa * 1000)));
+            if (g.ok) {
+                g.rhoExp = g.slope / pl.g;
+                g.rhoErr = Math.abs(g.rhoExp - fl.density) / fl.density * 100;
+                g.p0Exp = g.intercept / 1000;
+            }
+        });
+        return arr;
+    }
+
+    // =====================================================
+    // DIBUJO DE GRÁFICA (canvas 2D propio: monitor 3D, modal y PDF)
+    // =====================================================
+    function niceMax(v) {
+        if (v <= 0) return 1;
+        const p = Math.pow(10, Math.floor(Math.log10(v))), f = v / p;
+        return (f <= 1 ? 1 : f <= 2 ? 2 : f <= 2.5 ? 2.5 : f <= 5 ? 5 : 10) * p;
+    }
+    function drawChart(ctx, x0, y0, W, H, o) {
+        const dark = o.dark, mode = o.mode, fs = Math.max(0.55, W / 820);
+        const col = { text: dark ? '#cbd5e1' : '#1e293b', grid: dark ? 'rgba(255,255,255,0.09)' : '#e2e8f0', axis: dark ? '#64748b' : '#475569' };
+        const groups = computeGroups();
+        ctx.save(); ctx.translate(x0, y0);
+        if (!dark) { ctx.fillStyle = '#ffffff'; ctx.fillRect(0, 0, W, H); }
+        ctx.textBaseline = 'alphabetic';
+        if (!groups.length) {
+            ctx.fillStyle = dark ? '#64748b' : '#94a3b8'; ctx.textAlign = 'center'; ctx.font = `${16 * fs}px Inter, sans-serif`;
+            ctx.fillText('Sin datos: registra lecturas con la sonda', W / 2, H / 2);
+            ctx.restore(); return;
+        }
+        const m = { l: 74 * fs, r: 16 * fs, t: 16 * fs, b: 50 * fs };
+        const pw = W - m.l - m.r, ph = H - m.t - m.b;
+        const yv = p => mode === 'abs' ? p.pAbsKPa : p.pGaugeKPa;
+        const fitY = (g, h) => mode === 'abs' ? (g.slope * h + g.intercept) / 1000 : (g.slope * h + g.intercept) / 1000 - g.planet.p0;
+        let maxH = 0.5, maxY = 0;
+        groups.forEach(g => { g.pts.forEach(p => { maxH = Math.max(maxH, p.h); maxY = Math.max(maxY, yv(p)); }); });
+        const xMax = Math.max(1, Math.ceil(maxH * 2) / 2);
+        groups.forEach(g => { if (g.ok) maxY = Math.max(maxY, fitY(g, xMax)); });
+        const yMax = niceMax(maxY * 1.06);
+        const px = x => m.l + x / xMax * pw, py = y => m.t + ph - y / yMax * ph;
+
+        ctx.font = `${12 * fs}px Inter, sans-serif`; ctx.lineWidth = 1;
+        for (let i = 0; i <= 5; i++) {
+            const gy = yMax * i / 5, yy = py(gy);
+            ctx.strokeStyle = col.grid; ctx.beginPath(); ctx.moveTo(m.l, yy); ctx.lineTo(m.l + pw, yy); ctx.stroke();
+            ctx.fillStyle = col.text; ctx.textAlign = 'right';
+            ctx.fillText(gy >= 100 ? gy.toFixed(0) : gy.toFixed(1), m.l - 8 * fs, yy + 4 * fs);
+            const gx = xMax * i / 5, xx = px(gx);
+            ctx.strokeStyle = col.grid; ctx.beginPath(); ctx.moveTo(xx, m.t); ctx.lineTo(xx, m.t + ph); ctx.stroke();
+            ctx.fillStyle = col.text; ctx.textAlign = 'center';
+            ctx.fillText(gx.toFixed(1), xx, m.t + ph + 18 * fs);
+        }
+        ctx.strokeStyle = col.axis; ctx.lineWidth = 1.5 * fs;
+        ctx.beginPath(); ctx.moveTo(m.l, m.t); ctx.lineTo(m.l, m.t + ph); ctx.lineTo(m.l + pw, m.t + ph); ctx.stroke();
+
+        ctx.fillStyle = col.text; ctx.font = `${13 * fs}px Inter, sans-serif`; ctx.textAlign = 'center';
+        ctx.fillText('Profundidad h (m)', m.l + pw / 2, H - 8 * fs);
+        ctx.save(); ctx.translate(14 * fs, m.t + ph / 2); ctx.rotate(-Math.PI / 2);
+        ctx.fillText(mode === 'abs' ? 'Presión absoluta P (kPa)' : 'Presión manométrica (kPa)', 0, 0); ctx.restore();
+
+        // Rectas de ajuste y puntos
+        groups.forEach(g => {
+            if (g.ok) {
+                ctx.strokeStyle = g.color; ctx.lineWidth = 2 * fs; ctx.setLineDash([7 * fs, 5 * fs]);
+                ctx.beginPath(); ctx.moveTo(px(0), py(fitY(g, 0))); ctx.lineTo(px(xMax), py(fitY(g, xMax))); ctx.stroke(); ctx.setLineDash([]);
+            }
+            ctx.fillStyle = g.color;
+            g.pts.forEach(p => { ctx.beginPath(); ctx.arc(px(p.h), py(yv(p)), 4.2 * fs, 0, Math.PI * 2); ctx.fill(); if (!dark) { ctx.strokeStyle = '#fff'; ctx.lineWidth = fs; ctx.stroke(); } });
+        });
+        // Leyenda
+        ctx.textAlign = 'left'; ctx.font = `${12 * fs}px Inter, sans-serif`;
+        groups.slice(0, 6).forEach((g, i) => {
+            const ly = m.t + 16 * fs + i * 18 * fs;
+            ctx.fillStyle = g.color; ctx.beginPath(); ctx.arc(m.l + 14 * fs, ly - 4 * fs, 5 * fs, 0, Math.PI * 2); ctx.fill();
+            ctx.fillStyle = col.text; ctx.fillText(`${g.label} (n=${g.n})`, m.l + 26 * fs, ly);
+        });
+        ctx.restore();
+    }
+
+    // Monitor 3D
+    function drawMonitor() {
+        if (!monitorPanel) return;
+        const ctx = monitorPanel.ctx, W = monitorPanel.w, H = monitorPanel.h;
+        ctx.fillStyle = '#0b1220'; ctx.fillRect(0, 0, W, H);
+        ctx.fillStyle = '#111c33'; ctx.fillRect(0, 0, W, 50);
+        ctx.textAlign = 'left'; ctx.fillStyle = '#e2e8f0'; ctx.font = 'bold 24px Inter, sans-serif';
+        ctx.fillText('ESTACIÓN DE ANÁLISIS · Regresión P vs h', 18, 33);
+        ctx.textAlign = 'right'; ctx.fillStyle = '#38bdf8'; ctx.font = '600 16px Inter, sans-serif';
+        ctx.fillText(chartMode === 'abs' ? 'Presión absoluta' : 'Presión manométrica', W - 18, 32);
+        drawChart(ctx, 8, 58, 650, H - 100, { dark: true, mode: chartMode });
+
+        const groups = computeGroups();
+        ctx.textAlign = 'left';
+        ctx.fillStyle = '#94a3b8'; ctx.font = '600 14px Inter, sans-serif'; ctx.fillText('RESULTADOS DEL AJUSTE', 676, 82);
+        if (!groups.length) {
+            ctx.fillStyle = '#64748b'; ctx.font = '15px Inter, sans-serif';
+            ctx.fillText('Registra al menos 2 lecturas', 676, 112); ctx.fillText('con distinta profundidad.', 676, 134);
+        }
+        groups.slice(0, 4).forEach((g, i) => {
+            const y = 108 + i * 98;
+            ctx.fillStyle = g.color; ctx.beginPath(); ctx.arc(684, y - 5, 6, 0, Math.PI * 2); ctx.fill();
+            ctx.fillStyle = '#e2e8f0'; ctx.font = 'bold 15px Inter, sans-serif'; ctx.fillText(g.label, 698, y);
+            ctx.font = '14px Inter, sans-serif'; ctx.fillStyle = '#94a3b8';
+            if (g.ok) {
+                ctx.fillText(`m = ${g.slope.toFixed(0)} Pa/m  (teór. ${g.slopeTh.toFixed(0)})`, 676, y + 22);
+                ctx.fillText(`ρ exp = ${g.rhoExp.toFixed(1)} kg/m³ · err ${g.rhoErr.toFixed(2)}%`, 676, y + 42);
+                ctx.fillText(`P₀ exp = ${g.p0Exp.toFixed(2)} kPa · R² = ${g.r2.toFixed(4)}`, 676, y + 62);
+            } else { ctx.fillText('Faltan datos para ajustar (n<2 o misma h)', 676, y + 22); }
+        });
+        if (groups.length > 4) { ctx.fillStyle = '#64748b'; ctx.font = '13px Inter, sans-serif'; ctx.fillText(`+${groups.length - 4} combinaciones más (ver análisis completo)`, 676, 508); }
+        ctx.fillStyle = '#475569'; ctx.font = '13px Inter, sans-serif'; ctx.textAlign = 'left';
+        ctx.fillText(`Lecturas: ${recordedData.length} · Clic en el monitor para ampliar`, 18, H - 12);
+        monitorTex.needsUpdate = true;
+    }
+    function refreshMonitor() { drawMonitor(); }
+    if (document.fonts && document.fonts.ready) document.fonts.ready.then(() => { if (scene) { refreshMonitor(); drawSign(); updateCalculations(); } });
+
+    // =====================================================
+    // MODAL DE ANÁLISIS
+    // =====================================================
+    function setChartMode(m) {
+        chartMode = m;
+        $('mode-abs').className = 'px-2.5 py-1 rounded-lg ' + (m === 'abs' ? 'bg-blue-600 text-white' : 'bg-slate-800 text-slate-300');
+        $('mode-gauge').className = 'px-2.5 py-1 rounded-lg ' + (m === 'gauge' ? 'bg-blue-600 text-white' : 'bg-slate-800 text-slate-300');
+        refreshMonitor();
+        if (!$('analysis-modal').classList.contains('hidden')) drawModalChart();
+    }
+    function openAnalysisModal() {
+        $('analysis-modal').classList.remove('hidden');
+        requestAnimationFrame(refreshAnalysis);
+    }
+    function closeAnalysisModal() { $('analysis-modal').classList.add('hidden'); }
+    function drawModalChart() {
+        const c = $('regressionCanvas'), r = c.parentElement.getBoundingClientRect(), dpr = Math.min(window.devicePixelRatio || 1, 2);
+        c.width = Math.max(300, (r.width - 16) * dpr); c.height = Math.max(200, (r.height - 16) * dpr);
+        const ctx = c.getContext('2d'); ctx.clearRect(0, 0, c.width, c.height);
+        drawChart(ctx, 0, 0, c.width, c.height, { dark: true, mode: chartMode });
+    }
+    function refreshAnalysis() {
+        // Tabla de lecturas
+        const tb = $('table-data-body');
+        if (!recordedData.length) {
+            tb.innerHTML = `<tr><td colspan="5" class="p-4 text-center text-slate-500 font-sans">Sin datos. Usa "Registrar dato" o "Barrido automático".</td></tr>`;
+        } else {
+            tb.innerHTML = recordedData.map((d, i) => `
+                <tr class="hover:bg-slate-800/50">
+                    <td class="p-2 text-slate-400">${i + 1}</td>
+                    <td class="p-2 font-sans text-[11px] text-slate-300">${FLUIDS[d.fluidKey].name} · ${PLANETS[d.planetKey].name}</td>
+                    <td class="p-2 text-cyan-400 font-bold">${d.h.toFixed(2)}</td>
+                    <td class="p-2 text-emerald-400 font-bold">${d.pGaugeKPa.toFixed(2)}</td>
+                    <td class="p-2"><button onclick="removeRow(${i})" class="text-rose-400 hover:text-rose-300" title="Eliminar"><i class="fa-solid fa-xmark"></i></button></td>
+                </tr>`).join('');
+        }
+        // Tabla de resultados
+        const groups = computeGroups();
+        $('table-results-body').innerHTML = groups.length ? groups.map(g => g.ok ? `
+            <tr>
+                <td class="p-2.5 font-sans"><span class="inline-block w-2.5 h-2.5 rounded-full mr-2" style="background:${g.color}"></span>${g.label}</td>
+                <td class="p-2.5">${g.n}</td>
+                <td class="p-2.5 text-cyan-400">${g.slope.toFixed(1)}</td>
+                <td class="p-2.5">${g.slopeTh.toFixed(1)}</td>
+                <td class="p-2.5 text-emerald-400">${g.rhoExp.toFixed(1)}</td>
+                <td class="p-2.5 text-amber-400">${g.rhoErr.toFixed(2)}</td>
+                <td class="p-2.5">${g.p0Exp.toFixed(2)}</td>
+                <td class="p-2.5">${g.r2.toFixed(5)}</td>
+            </tr>` : `
+            <tr><td class="p-2.5 font-sans"><span class="inline-block w-2.5 h-2.5 rounded-full mr-2" style="background:${g.color}"></span>${g.label}</td><td class="p-2.5">${g.n}</td><td colspan="6" class="p-2.5 text-slate-500 font-sans">Se necesitan ≥ 2 lecturas con profundidades distintas</td></tr>`).join('')
+            : `<tr><td colspan="8" class="p-4 text-center text-slate-500 font-sans">Aún no hay resultados.</td></tr>`;
+        drawModalChart();
+    }
+
+    // =====================================================
+    // EXPORTACIÓN: EXCEL + PDF
+    // =====================================================
+    function fechaHoy() { return new Date().toLocaleString('es-PE', { dateStyle: 'long', timeStyle: 'short' }); }
+    function canExport() {
+        if (!recordedData.length) { showToast('Registra al menos una lectura antes de generar el informe', 'error'); return false; }
+        return true;
+    }
+    function exportReport() {
+        if (!canExport()) return;
+        exportExcel();
+        setTimeout(exportPDF, 500);
+    }
+
+    function exportExcel() {
+        if (!canExport()) return;
+        if (!window.XLSX) { showToast('No se pudo cargar la librería de Excel (¿sin internet?)', 'error'); return; }
+        const groups = computeGroups();
+        const wb = XLSX.utils.book_new();
+
+        const info = [
+            ['REPORTE DE LABORATORIO VIRTUAL - MECÁNICA DE FLUIDOS'], [],
+            ['Estudiante', studentProfile.name], ['Código', studentProfile.code], ['Sección', studentProfile.section],
+            ['Asignatura', studentProfile.course], ['Fecha de generación', fechaHoy()], [],
+            ['Objetivo', 'Estimar experimentalmente por simulación la pendiente presión-profundidad para distintos fluidos.'],
+            ['Modelo', 'P = P0 + ρ·g·h  (pendiente = ρ·g; intercepto = P0)'],
+            ['Total de lecturas', recordedData.length],
+            ['Ruido de sensor activo (última sesión)', $('chk-noise').checked ? 'Sí' : 'No']
+        ];
+        const ws1 = XLSX.utils.aoa_to_sheet(info); ws1['!cols'] = [{ wch: 34 }, { wch: 90 }];
+        XLSX.utils.book_append_sheet(wb, ws1, 'Informe');
+
+        const rows = [['N°', 'Planeta', 'g (m/s²)', 'P0 teórica (kPa)', 'Fluido', 'ρ teórica (kg/m³)', 'h (m)', 'P manométrica (kPa)', 'P absoluta medida (kPa)', 'P absoluta teórica (kPa)', 'Diferencia (kPa)']];
+        recordedData.forEach((d, i) => {
+            const pl = PLANETS[d.planetKey], fl = FLUIDS[d.fluidKey];
+            const th = pl.p0 + fl.density * pl.g * d.h / 1000;
+            rows.push([i + 1, pl.name, pl.g, pl.p0, fl.name, fl.density, +d.h.toFixed(3), +d.pGaugeKPa.toFixed(4), +d.pAbsKPa.toFixed(4), +th.toFixed(4), +(d.pAbsKPa - th).toFixed(4)]);
+        });
+        const ws2 = XLSX.utils.aoa_to_sheet(rows);
+        ws2['!cols'] = [6, 12, 10, 16, 20, 18, 9, 20, 22, 22, 16].map(w => ({ wch: w }));
+        XLSX.utils.book_append_sheet(wb, ws2, 'Datos');
+
+        const reg = [['Fluido', 'Planeta', 'n', 'Pendiente exp. (Pa/m)', 'ρ·g teórica (Pa/m)', 'ρ exp. (kg/m³)', 'ρ teórica (kg/m³)', 'Error ρ (%)', 'P0 exp. (kPa)', 'P0 teórica (kPa)', 'R²']];
+        groups.forEach(g => {
+            reg.push(g.ok ? [g.fluid.name, g.planet.name, g.n, +g.slope.toFixed(2), +g.slopeTh.toFixed(2), +g.rhoExp.toFixed(2), g.fluid.density, +g.rhoErr.toFixed(3), +g.p0Exp.toFixed(3), g.planet.p0, +g.r2.toFixed(6)]
+                : [g.fluid.name, g.planet.name, g.n, 'n/d', +g.slopeTh.toFixed(2), 'n/d', g.fluid.density, 'n/d', 'n/d', g.planet.p0, 'n/d']);
+        });
+        const ws3 = XLSX.utils.aoa_to_sheet(reg); ws3['!cols'] = [20, 12, 6, 22, 20, 16, 18, 12, 14, 16, 10].map(w => ({ wch: w }));
+        XLSX.utils.book_append_sheet(wb, ws3, 'Regresiones');
+
+        XLSX.writeFile(wb, `Reporte_Hidrostatica_${studentProfile.code}.xlsx`);
+        showToast('Excel generado', 'ok');
+    }
+
+    function exportPDF() {
+        if (!canExport()) return;
+        if (!window.jspdf) { showToast('No se pudo cargar la librería de PDF (¿sin internet?)', 'error'); return; }
+        const { jsPDF } = window.jspdf;
+        const doc = new jsPDF({ unit: 'mm', format: 'a4' });
+        const pw = 210, ph = 297, mx = 15;
+        const groups = computeGroups();
+        let y;
+        const ensure = h => { if (y + h > ph - 18) { doc.addPage(); y = 20; } };
+        const h2 = t => { ensure(14); doc.setFont('helvetica', 'bold'); doc.setFontSize(12); doc.setTextColor(2, 132, 199); doc.text(t, mx, y); y += 6; doc.setTextColor(30, 41, 59); };
+
+        doc.setFillColor(2, 132, 199); doc.rect(0, 0, pw, 26, 'F');
+        doc.setTextColor(255, 255, 255); doc.setFont('helvetica', 'bold'); doc.setFontSize(15);
+        doc.text('INFORME DE LABORATORIO - HIDROSTÁTICA', mx, 12);
+        doc.setFont('helvetica', 'normal'); doc.setFontSize(10);
+        doc.text('Influencia de la profundidad sobre la presión hidrostática en líquidos', mx, 19);
+
+        doc.autoTable({
+            startY: 32, theme: 'grid', styles: { fontSize: 9, cellPadding: 2 },
+            body: [
+                ['Estudiante', studentProfile.name, 'Código', studentProfile.code],
+                ['Sección', studentProfile.section, 'Asignatura', studentProfile.course],
+                ['Fecha', fechaHoy(), 'Lecturas', String(recordedData.length)]
+            ],
+            columnStyles: { 0: { fontStyle: 'bold', fillColor: [241, 245, 249], cellWidth: 25 }, 2: { fontStyle: 'bold', fillColor: [241, 245, 249], cellWidth: 25 } }
+        });
+        y = doc.lastAutoTable.finalY + 9;
+
+        h2('1. Objetivo y modelo físico');
+        doc.setFont('helvetica', 'normal'); doc.setFontSize(10);
+        const intro = doc.splitTextToSize('Estimar experimentalmente, mediante simulación en un tanque hidrostático virtual, la pendiente presión-profundidad para distintos fluidos y entornos gravitatorios, y validar el modelo P = P0 + rho·g·h. En la regresión lineal P(h) la pendiente corresponde a rho·g y el intercepto a P0.', pw - 2 * mx);
+        doc.text(intro, mx, y); y += intro.length * 4.6 + 4;
+
+        h2('2. Registro de datos experimentales');
+        doc.autoTable({
+            startY: y, theme: 'striped', styles: { fontSize: 8, cellPadding: 1.6 }, headStyles: { fillColor: [2, 132, 199] },
+            head: [['#', 'Planeta', 'g (m/s²)', 'Fluido', 'h (m)', 'P man (kPa)', 'P abs (kPa)']],
+            body: recordedData.map((d, i) => [i + 1, PLANETS[d.planetKey].name, PLANETS[d.planetKey].g, FLUIDS[d.fluidKey].name, d.h.toFixed(2), d.pGaugeKPa.toFixed(3), d.pAbsKPa.toFixed(3)])
+        });
+        y = doc.lastAutoTable.finalY + 9;
+
+        h2('3. Regresiones lineales y comparación de pendientes');
+        ensure(30);
+        doc.autoTable({
+            startY: y, theme: 'grid', styles: { fontSize: 8, cellPadding: 1.8 }, headStyles: { fillColor: [16, 185, 129] },
+            head: [['Fluido - Planeta', 'n', 'Pend. exp. (Pa/m)', 'rho·g teór. (Pa/m)', 'rho exp. (kg/m³)', 'Error (%)', 'P0 exp. (kPa)', 'R²']],
+            body: groups.map(g => g.ok
+                ? [g.label.replace('·', '-'), g.n, g.slope.toFixed(1), g.slopeTh.toFixed(1), g.rhoExp.toFixed(1), g.rhoErr.toFixed(2), g.p0Exp.toFixed(2), g.r2.toFixed(5)]
+                : [g.label.replace('·', '-'), g.n, 'n/d', g.slopeTh.toFixed(1), 'n/d', 'n/d', 'n/d', 'n/d'])
+        });
+        y = doc.lastAutoTable.finalY + 9;
+
+        h2('4. Gráfica P vs h');
+        ensure(95);
+        const cv = document.createElement('canvas'); cv.width = 1400; cv.height = 700;
+        const cctx = cv.getContext('2d');
+        drawChart(cctx, 0, 0, cv.width, cv.height, { dark: false, mode: 'abs' });
+        doc.addImage(cv.toDataURL('image/png'), 'PNG', mx, y, pw - 2 * mx, (pw - 2 * mx) / 2);
+        y += (pw - 2 * mx) / 2 + 8;
+
+        h2('5. Conclusiones');
+        doc.setFont('helvetica', 'normal'); doc.setFontSize(10);
+        const lines = [];
+        groups.filter(g => g.ok).forEach(g => lines.push(`- ${g.label.replace('·', 'en')}: pendiente experimental ${g.slope.toFixed(1)} Pa/m frente a ${g.slopeTh.toFixed(1)} Pa/m teórica (error de rho ${g.rhoErr.toFixed(2)} %, R² = ${g.r2.toFixed(4)}).`));
+        if (!lines.length) lines.push('- Aún no hay suficientes datos para ajustar una recta (se requieren al menos 2 profundidades distintas por fluido/planeta).');
+        lines.push('- La presión crece linealmente con la profundidad y su pendiente es proporcional a rho·g: a mayor densidad o mayor gravedad, mayor pendiente.');
+        lines.forEach(l => { const w = doc.splitTextToSize(l, pw - 2 * mx); ensure(w.length * 4.6 + 2); doc.text(w, mx, y); y += w.length * 4.6 + 1.5; });
+
+        ensure(35); y += 18;
+        doc.setDrawColor(0); doc.line(mx, y, mx + 60, y); doc.line(pw - mx - 60, y, pw - mx, y);
+        doc.setFontSize(9); doc.text('Firma del estudiante', mx + 30, y + 5, { align: 'center' }); doc.text('V°B° Docente / Asistente', pw - mx - 30, y + 5, { align: 'center' });
+
+        const pages = doc.getNumberOfPages();
+        for (let i = 1; i <= pages; i++) { doc.setPage(i); doc.setFontSize(8); doc.setTextColor(120); doc.text(`Laboratorio Virtual 3D - Mecánica de Fluidos · Página ${i} de ${pages}`, pw / 2, ph - 8, { align: 'center' }); }
+        doc.save(`Reporte_Hidrostatica_${studentProfile.code}.pdf`);
+        showToast('PDF generado', 'ok');
+    }
+
+    // =====================================================
+    // CÁMARA E INTERACCIÓN 3D (clic en monitor y botón)
+    // =====================================================
+    let camAnimId = 0;
+    const CAM_PRESETS = {
+        general: { p: [0, 1.7, 8.3], t: [0, 2.6, 0] },
+        tank:    { p: [-4, 3.0, 5.8], t: [-4, 3.4, 0] },
+        desk:    { p: [3.7, 2.0, 3.9], t: [3.7, 2.1, 0] },
+        monitor: { p: [4.3, 2.3, 2.45], t: [4.3, 2.25, -0.4] },
+        window:  { p: [0, 2.0, -3.2], t: [0, 3.2, -30] }
+    };
+    function setCameraPreset(preset) {
+        const c = CAM_PRESETS[preset]; if (!c) return;
+        currentPreset = preset;
+        camera.fov = 45; camera.updateProjectionMatrix();
+        animatePlayerTo(c.p, c.t);
+    }
+    function animatePlayerTo(p, t) {
+        const myId = ++camAnimId;
+        const sp = player.pos.clone(), sy = player.yaw, sx = player.pitch;
+        const ep = new THREE.Vector3(p[0], p[1], p[2]);
+        const a = lookAngles(p, t);
+        let d = a.yaw - sy; while (d > Math.PI) d -= 2 * Math.PI; while (d < -Math.PI) d += 2 * Math.PI;
+        const ey = sy + d, ex = a.pitch;
+        let n = 0; const N = 45;
+        (function step() {
+            if (myId !== camAnimId) return;
+            n++; const k = n / N, e = 0.5 - Math.cos(k * Math.PI) / 2;
+            player.pos.lerpVectors(sp, ep, e);
+            player.yaw = sy + (ey - sy) * e; player.pitch = sx + (ex - sx) * e;
+            if (n < N) requestAnimationFrame(step);
+        })();
+    }
+
+    const raycaster = new THREE.Raycaster(), mouse = new THREE.Vector2();
+    function pick(ev) {
+        const r = renderer.domElement.getBoundingClientRect();
+        mouse.x = ((ev.clientX - r.left) / r.width) * 2 - 1;
+        mouse.y = -((ev.clientY - r.top) / r.height) * 2 + 1;
+        raycaster.setFromCamera(mouse, camera);
+        const hits = raycaster.intersectObjects(interactives, false);
+        return hits.length ? hits[0].object : null;
+    }
+    function setupPointerInteraction() {
+        const el = renderer.domElement;
+        let down = null, lx = 0, ly = 0;
+        el.style.touchAction = 'none';
+        el.addEventListener('pointerdown', e => {
+            const ae = document.activeElement;
+            if (ae && ae !== document.body && ae.blur) ae.blur();
+            down = { x: e.clientX, y: e.clientY, t: performance.now() }; lx = e.clientX; ly = e.clientY; camAnimId++;
+            try { el.setPointerCapture(e.pointerId); } catch (err) {}
+            el.style.cursor = 'grabbing';
+        });
+        el.addEventListener('pointerup', e => {
+            if (!down) return;
+            const moved = Math.hypot(e.clientX - down.x, e.clientY - down.y), dt = performance.now() - down.t;
+            down = null; el.style.cursor = 'grab';
+            if (moved < 6 && dt < 500) { const o = pick(e); if (o) handleAction(o.userData.action); }
+        });
+        el.addEventListener('pointercancel', () => { down = null; el.style.cursor = 'grab'; });
+        el.addEventListener('pointermove', e => {
+            if (down) {
+                const k = 0.0032 * (camera.fov / 45);
+                player.yaw += (e.clientX - lx) * k;
+                player.pitch = Math.max(-1.35, Math.min(1.35, player.pitch + (e.clientY - ly) * k));
+                lx = e.clientX; ly = e.clientY; return;
+            }
+            const o = pick(e);
+            hovered = o ? o.userData.action : null;
+            el.style.cursor = o ? 'pointer' : 'grab';
+        });
+        el.addEventListener('wheel', e => {
+            e.preventDefault();
+            camera.fov = Math.max(25, Math.min(75, camera.fov + e.deltaY * 0.03));
+            camera.updateProjectionMatrix();
+        }, { passive: false });
+    }
+    function handleAction(a) {
+        if (a === 'monitor') {
+            if (camera.position.distanceTo(new THREE.Vector3(4.3, 2.2, -0.4)) < 3.4) openAnalysisModal(); else setCameraPreset('monitor');
+        } else if (a === 'report') {
+            pressReportButton();
+        }
+    }
+    function pressReportButton() {
+        if (btnMesh) { btnMesh.position.y = 0.2; setTimeout(() => { btnMesh.position.y = 0.28; }, 180); }
+        exportReport();
+    }
+
+    // =====================================================
+    // LABORATORIO CERRADO Y MODERNO (cascarón, mobiliario y equipos)
+    // =====================================================
+    let LM = null;
+
+    function cvs(w, h, fn) { const c = document.createElement('canvas'); c.width = w; c.height = h; fn(c.getContext('2d'), w, h); return c; }
+    function texFromCanvas(c, rx, ry) {
+        const t = new THREE.CanvasTexture(c);
+        t.wrapS = t.wrapT = THREE.RepeatWrapping; t.repeat.set(rx || 1, ry || 1); t.anisotropy = 4;
+        return t;
+    }
+    function mk(geo, mat, x, y, z, parent) {
+        const m = new THREE.Mesh(geo, mat); m.position.set(x, y, z); if (parent) parent.add(m); return m;
+    }
+    function rnd(a, b) { return a + Math.random() * (b - a); }
+    function liqMat(color) {
+        if (!LM.liq[color]) LM.liq[color] = new THREE.MeshStandardMaterial({ color: color, roughness: 0.2, transparent: true, opacity: 0.85 });
+        return LM.liq[color];
+    }
+
+    // ---------- Texturas dibujadas con canvas ----------
+    function drawFloor(ctx, w, h) {
+        const n = 2, s = w / n;
+        for (let i = 0; i < n; i++) for (let j = 0; j < n; j++) {
+            const v = 214 + Math.floor(rnd(-6, 6));
+            ctx.fillStyle = `rgb(${v},${v - 3},${v - 9})`; ctx.fillRect(i * s, j * s, s, s);
+            for (let k = 0; k < 500; k++) { ctx.fillStyle = `rgba(120,115,105,${rnd(0.03, 0.09)})`; ctx.fillRect(i * s + rnd(0, s), j * s + rnd(0, s), rnd(1, 3), rnd(1, 3)); }
+        }
+        ctx.strokeStyle = '#b4afa5'; ctx.lineWidth = 4;
+        for (let i = 0; i <= n; i++) {
+            ctx.beginPath(); ctx.moveTo(i * s, 0); ctx.lineTo(i * s, h); ctx.stroke();
+            ctx.beginPath(); ctx.moveTo(0, i * s); ctx.lineTo(w, i * s); ctx.stroke();
+        }
+    }
+    function drawCeil(ctx, w, h) {
+        ctx.fillStyle = '#f3f5f7'; ctx.fillRect(0, 0, w, h);
+        for (let k = 0; k < 260; k++) { ctx.fillStyle = `rgba(150,158,166,${rnd(0.05, 0.18)})`; ctx.fillRect(rnd(0, w), rnd(0, h), 2, 2); }
+        ctx.strokeStyle = '#c9d0d6'; ctx.lineWidth = 6; ctx.strokeRect(0, 0, w, h);
+    }
+    function drawDash(ctx, w, h) {
+        ctx.fillStyle = '#0b1220'; ctx.fillRect(0, 0, w, h);
+        ctx.fillStyle = '#16233b'; ctx.fillRect(0, 0, w, 38);
+        ctx.fillStyle = '#7dd3fc'; ctx.font = 'bold 20px Arial, sans-serif'; ctx.textAlign = 'left'; ctx.fillText('LAB · P vs h', 14, 26);
+        ctx.strokeStyle = 'rgba(255,255,255,0.12)'; ctx.lineWidth = 1;
+        for (let i = 1; i < 6; i++) { ctx.beginPath(); ctx.moveTo(20, 40 + i * 42); ctx.lineTo(w - 20, 40 + i * 42); ctx.stroke(); }
+        ['#38bdf8', '#f59e0b', '#34d399'].forEach((c, k) => {
+            ctx.strokeStyle = c; ctx.lineWidth = 3; ctx.beginPath();
+            for (let x = 0; x <= 10; x++) { const px = 30 + x * 45, py = h - 30 - x * (6 + k * 5) - k * 6; if (x) ctx.lineTo(px, py); else ctx.moveTo(px, py); }
+            ctx.stroke();
+        });
+    }
+    function drawDrawers(ctx, w, h) {
+        ctx.fillStyle = '#e4e9ee'; ctx.fillRect(0, 0, w, h);
+        const n = 3, gap = 6, dh = (h - gap * (n + 1)) / n;
+        for (let i = 0; i < n; i++) {
+            const y = gap + i * (dh + gap);
+            ctx.fillStyle = '#fafbfc'; roundRect(ctx, gap, y, w - 2 * gap, dh, 8); ctx.fill();
+            ctx.strokeStyle = '#c3cad2'; ctx.lineWidth = 3; ctx.stroke();
+            ctx.fillStyle = '#59636f'; roundRect(ctx, w / 2 - 46, y + 14, 92, 9, 4); ctx.fill();
+        }
+    }
+    function drawDoors(ctx, w, h) {
+        ctx.fillStyle = '#e4e9ee'; ctx.fillRect(0, 0, w, h);
+        for (let i = 0; i < 2; i++) {
+            const x = 6 + i * (w / 2), dw = w / 2 - 12;
+            ctx.fillStyle = '#fafbfc'; roundRect(ctx, x, 6, dw, h - 12, 8); ctx.fill();
+            ctx.strokeStyle = '#c3cad2'; ctx.lineWidth = 3; ctx.stroke();
+            ctx.fillStyle = '#59636f'; roundRect(ctx, i === 0 ? x + dw - 20 : x + 12, h / 2 - 34, 8, 68, 4); ctx.fill();
+        }
+    }
+    function drawGlassCab(ctx, w, h) {
+        ctx.fillStyle = '#e1e7ec'; ctx.fillRect(0, 0, w, h);
+        const m = 14, gx = m, gy = m, gw = w - 2 * m, gh = h - 2 * m;
+        const g = ctx.createLinearGradient(0, gy, 0, gy + gh); g.addColorStop(0, '#b9c8d4'); g.addColorStop(1, '#93a8b8');
+        ctx.fillStyle = g; ctx.fillRect(gx, gy, gw, gh);
+        const cols = ['#2563eb', '#f59e0b', '#10b981', '#f1f5f9', '#a78bfa', '#ef4444', '#92400e', '#38bdf8'];
+        for (let s = 0; s < 4; s++) {
+            const by = gy + (s + 1) * gh / 4 - 10;
+            let x = gx + 14;
+            while (x < gx + gw - 50) {
+                const bw = rnd(20, 44), bh = rnd(36, 84);
+                ctx.fillStyle = cols[Math.floor(rnd(0, cols.length))]; roundRect(ctx, x, by - bh, bw, bh, 5); ctx.fill();
+                ctx.fillStyle = '#1f2937'; ctx.fillRect(x + bw * 0.28, by - bh - 8, bw * 0.44, 8);
+                x += bw + rnd(8, 22);
+            }
+            ctx.fillStyle = '#eef2f6'; ctx.fillRect(gx, by, gw, 9);
+        }
+        ctx.fillStyle = '#e1e7ec'; ctx.fillRect(w / 2 - 5, 0, 10, h);
+        ctx.fillStyle = 'rgba(255,255,255,0.16)';
+        ctx.beginPath(); ctx.moveTo(gx + gw * 0.08, gy); ctx.lineTo(gx + gw * 0.30, gy); ctx.lineTo(gx + gw * 0.12, gy + gh); ctx.lineTo(gx, gy + gh); ctx.closePath(); ctx.fill();
+    }
+    function drawBoard(ctx, w, h) {
+        ctx.fillStyle = '#ffffff'; ctx.fillRect(0, 0, w, h);
+        ctx.strokeStyle = '#cbd5e1'; ctx.lineWidth = 10; ctx.strokeRect(5, 5, w - 10, h - 10);
+        ctx.textAlign = 'left';
+        ctx.fillStyle = '#0f172a'; ctx.font = 'bold 54px Arial, sans-serif'; ctx.fillText('PRESIÓN HIDROSTÁTICA', 50, 90);
+        ctx.fillStyle = '#0369a1'; ctx.font = 'bold 96px Arial, sans-serif'; ctx.fillText('P = P₀ + ρ·g·h', 50, 215);
+        ctx.fillStyle = '#334155'; ctx.font = '34px Arial, sans-serif';
+        ['ρ: densidad del fluido (kg/m³)', 'g: gravedad del planeta (m/s²)', 'h: profundidad (m)', 'La pendiente de P vs h es ρ·g'].forEach((t, i) => ctx.fillText(t, 50, 290 + i * 48));
+        ctx.strokeStyle = '#0f172a'; ctx.lineWidth = 6; ctx.strokeRect(700, 130, 240, 300);
+        ctx.fillStyle = 'rgba(56,189,248,0.55)'; ctx.fillRect(703, 190, 234, 237);
+        ctx.strokeStyle = '#dc2626'; ctx.lineWidth = 5;
+        ctx.beginPath(); ctx.moveTo(975, 190); ctx.lineTo(975, 380); ctx.stroke();
+        ctx.beginPath(); ctx.moveTo(963, 368); ctx.lineTo(975, 384); ctx.lineTo(987, 368); ctx.stroke();
+        ctx.fillStyle = '#dc2626'; ctx.font = 'bold 40px Arial, sans-serif'; ctx.fillText('h', 985, 300);
+        ctx.fillStyle = '#0f172a'; ctx.font = 'bold 34px Arial, sans-serif'; ctx.fillText('P₀', 790, 112);
+    }
+    function posterCanvas(title, sub, c1) {
+        return cvs(256, 360, (ctx, w, h) => {
+            ctx.fillStyle = '#ffffff'; ctx.fillRect(0, 0, w, h);
+            ctx.fillStyle = c1; ctx.fillRect(0, 0, w, 70);
+            ctx.textAlign = 'center';
+            ctx.fillStyle = '#ffffff'; ctx.font = 'bold 26px Arial, sans-serif'; ctx.fillText(title, w / 2, 45);
+            ctx.fillStyle = c1; ctx.beginPath(); ctx.arc(w / 2, 160, 56, 0, Math.PI * 2); ctx.fill();
+            ctx.fillStyle = '#ffffff'; ctx.font = 'bold 80px Arial, sans-serif'; ctx.fillText('!', w / 2, 188);
+            ctx.fillStyle = '#334155'; ctx.font = '20px Arial, sans-serif';
+            sub.split('\n').forEach((t, i) => ctx.fillText(t, w / 2, 262 + i * 28));
+            ctx.strokeStyle = '#cbd5e1'; ctx.lineWidth = 6; ctx.strokeRect(3, 3, w - 6, h - 6);
+        });
+    }
+    function clockCanvas() {
+        return cvs(256, 256, (ctx) => {
+            ctx.fillStyle = '#ffffff'; ctx.beginPath(); ctx.arc(128, 128, 122, 0, Math.PI * 2); ctx.fill();
+            ctx.strokeStyle = '#1e293b'; ctx.lineWidth = 10; ctx.stroke();
+            for (let i = 0; i < 12; i++) {
+                const a = i * Math.PI / 6; ctx.lineWidth = i % 3 ? 3 : 7;
+                ctx.beginPath(); ctx.moveTo(128 + Math.sin(a) * 98, 128 - Math.cos(a) * 98); ctx.lineTo(128 + Math.sin(a) * 112, 128 - Math.cos(a) * 112); ctx.stroke();
+            }
+            ctx.lineCap = 'round'; ctx.lineWidth = 9;
+            const ah = (10 + 10 / 60) * Math.PI / 6; ctx.beginPath(); ctx.moveTo(128, 128); ctx.lineTo(128 + Math.sin(ah) * 62, 128 - Math.cos(ah) * 62); ctx.stroke();
+            const am = 10 * Math.PI / 30; ctx.lineWidth = 6; ctx.beginPath(); ctx.moveTo(128, 128); ctx.lineTo(128 + Math.sin(am) * 92, 128 - Math.cos(am) * 92); ctx.stroke();
+        });
+    }
+    function exitCanvas() {
+        return cvs(256, 80, (ctx, w, h) => {
+            ctx.fillStyle = '#15803d'; ctx.fillRect(0, 0, w, h);
+            ctx.fillStyle = '#ffffff'; ctx.font = 'bold 48px Arial, sans-serif'; ctx.textAlign = 'center'; ctx.fillText('SALIDA', w / 2, 58);
+        });
+    }
+
+    // ---------- Materiales y geometrías compartidas ----------
+    function initLabMaterials() {
+        const std = (c, r, m, extra) => new THREE.MeshStandardMaterial(Object.assign({ color: c, roughness: r, metalness: m || 0 }, extra || {}));
+        LM = {
+            white: std(0xf6f8fa, 0.35, 0.02),
+            wall: std(0xf3f6f9, 0.7, 0),
+            clad: std(0xdfe7ee, 0.7, 0),
+            accent: std(0x0ea5e9, 0.4, 0.1),
+            steel: std(0xd3dae1, 0.45, 0.15),
+            dark: std(0x1a2230, 0.4, 0.2),
+            plastic: std(0x2b3440, 0.5, 0.1),
+            blue: std(0x2563eb, 0.4, 0.2),
+            topBlack: std(0x1b2027, 0.18, 0.1),
+            topWhite: std(0xeef2f5, 0.2, 0.05),
+            kick: std(0x252c36, 0.6, 0.1),
+            doorMat: std(0xdfe6ec, 0.45, 0.1),
+            glass: std(0xcfe6f3, 0.08, 0.1, { transparent: true, opacity: 0.28, depthWrite: false }),
+            led: new THREE.MeshBasicMaterial({ color: 0xffffff, toneMapped: false }),
+            liq: {},
+            bGeo: [new THREE.CylinderGeometry(0.035, 0.035, 0.18, 12), new THREE.CylinderGeometry(0.04, 0.04, 0.24, 12), new THREE.CylinderGeometry(0.05, 0.05, 0.14, 12)],
+            capGeo: new THREE.CylinderGeometry(0.02, 0.02, 0.04, 8)
+        };
+        LM.bMat = [0x92400e, 0x1d4ed8, 0x15803d, 0xdbeafe, 0xf1f5f9, 0xb91c1c].map(c => std(c, 0.3, 0.05));
+        LM.cDrawers = cvs(256, 256, drawDrawers);
+        LM.cDoors = cvs(256, 256, drawDoors);
+        LM.cGlass = cvs(512, 512, drawGlassCab);
+        LM.dashTex = new THREE.CanvasTexture(cvs(512, 320, drawDash));
+    }
+
+    // ---------- Cascarón: suelo, techo, paredes, ventanal ----------
+    function buildRoomShell() {
+        const wbox = (w, h, d, x, y, z, mat) => { const m = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), mat); m.position.set(x, y, z); m.receiveShadow = true; scene.add(m); return m; };
+        const wplane = (w, h, x, y, z, rotY, mat) => { const m = new THREE.Mesh(new THREE.PlaneGeometry(w, h), mat); m.position.set(x, y, z); m.rotation.y = rotY; scene.add(m); return m; };
+
+        // Suelo de porcelanato pulido
+        const floorTex = texFromCanvas(cvs(512, 512, drawFloor), 10.2, 8.5); floorTex.anisotropy = 8;
+        const floor = new THREE.Mesh(new THREE.PlaneGeometry(24.4, 20.4), new THREE.MeshStandardMaterial({ map: floorTex, roughness: 0.16, metalness: 0.08 }));
+        floor.rotation.x = -Math.PI / 2; floor.receiveShadow = true; scene.add(floor);
+
+        // Techo con baldosas y luminarias LED
+        const ceil = new THREE.Mesh(new THREE.PlaneGeometry(24.4, 20.4), new THREE.MeshStandardMaterial({ map: texFromCanvas(cvs(256, 256, drawCeil), 20.3, 17), roughness: 0.95 }));
+        ceil.rotation.x = Math.PI / 2; ceil.position.y = 8; scene.add(ceil);
+        const ledGeo = new THREE.BoxGeometry(1.2, 0.04, 0.6);
+        [-8.4, -4.2, 0, 4.2, 8.4].forEach(x => [-7, -3, 1, 5].forEach(z => mk(ledGeo, LM.led, x, 7.97, z, scene)));
+
+        // Paredes (ventanal en la pared trasera) y pared frontal
+        wbox(6, 8, 0.4, -9, 4, -10, LM.wall);
+        wbox(6, 8, 0.4, 9, 4, -10, LM.wall);
+        wbox(12, 2, 0.4, 0, 7, -10, LM.wall);
+        wbox(12, 1, 0.4, 0, 0.5, -10, LM.wall);
+        wbox(0.4, 8, 20.4, -12, 4, 0, LM.wall);
+        wbox(0.4, 8, 20.4, 12, 4, 0, LM.wall);
+        wbox(24.4, 8, 0.4, 0, 4, 10, LM.wall);
+
+        // Revestimiento superior bicolor + franja de acento
+        wplane(19.6, 3.6, -11.79, 6.2, 0, Math.PI / 2, LM.clad);
+        wplane(19.6, 3.6, 11.79, 6.2, 0, -Math.PI / 2, LM.clad);
+        wplane(23.6, 3.6, 0, 6.2, 9.79, Math.PI, LM.clad);
+        wplane(5.8, 3.6, -8.9, 6.2, -9.79, 0, LM.clad);
+        wplane(5.8, 3.6, 8.9, 6.2, -9.79, 0, LM.clad);
+        wplane(12, 1.9, 0, 7.05, -9.79, 0, LM.clad);
+        wbox(0.03, 0.1, 19.6, -11.78, 4.4, 0, LM.accent);
+        wbox(0.03, 0.1, 19.6, 11.78, 4.4, 0, LM.accent);
+        wbox(23.6, 0.1, 0.03, 0, 4.4, 9.78, LM.accent);
+        wbox(5.8, 0.1, 0.03, -8.9, 4.4, -9.78, LM.accent);
+        wbox(5.8, 0.1, 0.03, 8.9, 4.4, -9.78, LM.accent);
+        wbox(23.6, 0.1, 0.03, 0, 0.05, 9.78, LM.kick);
+
+        // Ventanal: marco, divisiones, cristal y repisa
+        [[12.4, 0.2, 0.3, 0, 6.1], [12.4, 0.2, 0.3, 0, 0.95], [0.2, 5.3, 0.3, -6.1, 3.5], [0.2, 5.3, 0.3, 6.1, 3.5], [0.08, 5, 0.2, -2, 3.5], [0.08, 5, 0.2, 2, 3.5]]
+            .forEach(a => wbox(a[0], a[1], a[2], a[3], a[4], -9.85, LM.steel));
+        const glass = new THREE.Mesh(new THREE.BoxGeometry(12, 5, 0.04), new THREE.MeshStandardMaterial({ color: 0xbfdbfe, transparent: true, opacity: 0.07, roughness: 0.05, depthWrite: false }));
+        glass.position.set(0, 3.5, -9.85); scene.add(glass);
+        wbox(12.6, 0.06, 0.45, 0, 1.03, -9.62, LM.white);
+    }
+
+    // ---------- Muebles ----------
+    function baseRun(cx, cz, rotY, len, depth, kind, topMat) {
+        const g = new THREE.Group(); g.position.set(cx, 0, cz); g.rotation.y = rotY; scene.add(g);
+        const isDoors = kind === 'doors';
+        const front = new THREE.MeshStandardMaterial({ map: texFromCanvas(isDoors ? LM.cDoors : LM.cDrawers, len / (isDoors ? 1.2 : 0.9), 1), roughness: 0.4 });
+        const body = new THREE.Mesh(new THREE.BoxGeometry(len, 0.8, depth), [LM.white, LM.white, LM.white, LM.white, front, LM.white]);
+        body.position.y = 0.5; body.castShadow = true; body.receiveShadow = true; g.add(body);
+        mk(new THREE.BoxGeometry(len - 0.02, 0.1, depth - 0.1), LM.kick, 0, 0.05, -0.03, g);
+        const top = mk(new THREE.BoxGeometry(len + 0.02, 0.05, depth + 0.06), topMat, 0, 0.925, 0.02, g);
+        top.castShadow = true; top.receiveShadow = true;
+        return g;
+    }
+    function upperRun(cx, cz, rotY, len, y0, h, kind) {
+        const g = new THREE.Group(); g.position.set(cx, y0 + h / 2, cz); g.rotation.y = rotY; scene.add(g);
+        const isGlass = kind === 'glass';
+        const front = new THREE.MeshStandardMaterial({ map: texFromCanvas(isGlass ? LM.cGlass : LM.cDoors, len / 1.2, 1), roughness: isGlass ? 0.25 : 0.4, metalness: isGlass ? 0.1 : 0 });
+        const body = new THREE.Mesh(new THREE.BoxGeometry(len, h, 0.38), [LM.white, LM.white, LM.white, LM.white, front, LM.white]);
+        body.castShadow = true; g.add(body);
+        mk(new THREE.BoxGeometry(len - 0.1, 0.015, 0.05), LM.led, 0, -h / 2 - 0.008, 0.1, g);
+        return g;
+    }
+    function openShelf(cx, cz, rotY, len, y0) {
+        const g = new THREE.Group(); g.position.set(cx, y0, cz); g.rotation.y = rotY; scene.add(g);
+        for (let i = 0; i < 3; i++) {
+            mk(new THREE.BoxGeometry(len, 0.04, 0.32), LM.white, 0, i * 0.5, 0, g);
+            let x = -len / 2 + 0.2;
+            while (x < len / 2 - 0.15) {
+                const r = Math.random(), z = rnd(-0.04, 0.04), by = i * 0.5 + 0.02;
+                if (r < 0.62) {
+                    const k = Math.floor(rnd(0, 3)), hgt = [0.18, 0.24, 0.14][k];
+                    mk(LM.bGeo[k], LM.bMat[Math.floor(rnd(0, LM.bMat.length))], x, by + hgt / 2, z, g);
+                    mk(LM.capGeo, LM.dark, x, by + hgt + 0.02, z, g);
+                } else if (r < 0.8) {
+                    const f = makeFlask([0x38bdf8, 0xf59e0b, 0x34d399, 0xa78bfa][Math.floor(rnd(0, 4))]); f.position.set(x, by, z); g.add(f);
+                } else {
+                    const b = makeBeaker([0x38bdf8, 0xf59e0b, 0x34d399][Math.floor(rnd(0, 3))]); b.position.set(x, by, z); g.add(b);
+                }
+                x += rnd(0.17, 0.28);
+            }
+        }
+        mk(new THREE.BoxGeometry(0.04, 1.04, 0.32), LM.white, -len / 2, 0.5, 0, g);
+        mk(new THREE.BoxGeometry(0.04, 1.04, 0.32), LM.white, len / 2, 0.5, 0, g);
+        return g;
+    }
+    function put(parent, obj, lx, lz, rot) { obj.position.set(lx, 0.95, lz); obj.rotation.y = rot || 0; parent.add(obj); return obj; }
+
+    // ---------- Equipos ----------
+    function makeMicroscope() {
+        const g = new THREE.Group(), W = LM.white;
+        mk(new THREE.BoxGeometry(0.26, 0.03, 0.32), W, 0, 0.015, 0, g);
+        mk(new THREE.BoxGeometry(0.045, 0.30, 0.05), W, 0, 0.18, -0.11, g);
+        mk(new THREE.BoxGeometry(0.05, 0.05, 0.2), W, 0, 0.33, -0.02, g);
+        const head = mk(new THREE.CylinderGeometry(0.035, 0.035, 0.18, 14), W, 0, 0.40, 0.05, g); head.rotation.x = 0.55;
+        const eye = mk(new THREE.CylinderGeometry(0.018, 0.022, 0.09, 12), LM.dark, 0, 0.465, 0.10, g); eye.rotation.x = 0.55;
+        mk(new THREE.BoxGeometry(0.17, 0.012, 0.15), LM.dark, 0, 0.12, 0.04, g);
+        mk(new THREE.CylinderGeometry(0.012, 0.012, 0.07, 10), LM.blue, 0, 0.205, 0.045, g);
+        const kn = mk(new THREE.CylinderGeometry(0.025, 0.025, 0.03, 12), LM.dark, 0.04, 0.12, -0.1, g); kn.rotation.z = Math.PI / 2;
+        g.traverse(o => { if (o.isMesh) o.castShadow = true; });
+        return g;
+    }
+    function makeMonitor() {
+        const g = new THREE.Group();
+        mk(new THREE.BoxGeometry(0.62, 0.38, 0.03), LM.dark, 0, 0.42, 0, g);
+        const scr = new THREE.Mesh(new THREE.PlaneGeometry(0.57, 0.33), new THREE.MeshBasicMaterial({ map: LM.dashTex, toneMapped: false }));
+        scr.position.set(0, 0.42, 0.017); g.add(scr);
+        mk(new THREE.BoxGeometry(0.04, 0.2, 0.03), LM.dark, 0, 0.11, -0.03, g);
+        mk(new THREE.BoxGeometry(0.22, 0.012, 0.16), LM.dark, 0, 0.006, -0.02, g);
+        mk(new THREE.BoxGeometry(0.42, 0.014, 0.14), LM.dark, 0, 0.007, 0.26, g);
+        mk(new THREE.BoxGeometry(0.05, 0.02, 0.08), LM.dark, 0.32, 0.01, 0.26, g);
+        return g;
+    }
+    function makeFlask(color) {
+        const g = new THREE.Group();
+        mk(new THREE.CylinderGeometry(0.02, 0.07, 0.14, 16), LM.glass, 0, 0.07, 0, g);
+        mk(new THREE.CylinderGeometry(0.022, 0.022, 0.07, 12), LM.glass, 0, 0.175, 0, g);
+        mk(new THREE.CylinderGeometry(0.045, 0.062, 0.06, 16), liqMat(color), 0, 0.035, 0, g);
+        return g;
+    }
+    function makeBeaker(color) {
+        const g = new THREE.Group();
+        mk(new THREE.CylinderGeometry(0.045, 0.04, 0.11, 16), LM.glass, 0, 0.055, 0, g);
+        mk(new THREE.CylinderGeometry(0.04, 0.037, 0.07, 16), liqMat(color), 0, 0.04, 0, g);
+        return g;
+    }
+    function makeCentrifuge() {
+        const g = new THREE.Group();
+        mk(new THREE.BoxGeometry(0.36, 0.17, 0.34), LM.white, 0, 0.085, 0, g);
+        mk(new THREE.CylinderGeometry(0.14, 0.14, 0.04, 20), LM.dark, 0, 0.19, 0, g);
+        mk(new THREE.BoxGeometry(0.1, 0.04, 0.01), new THREE.MeshBasicMaterial({ color: 0x38bdf8, toneMapped: false }), 0.08, 0.1, 0.171, g);
+        g.traverse(o => { if (o.isMesh) o.castShadow = true; });
+        return g;
+    }
+    function makeAnalyzer() {
+        const g = new THREE.Group();
+        mk(new THREE.BoxGeometry(0.5, 0.3, 0.35), LM.white, 0, 0.15, 0, g);
+        const s = new THREE.Mesh(new THREE.PlaneGeometry(0.3, 0.18), new THREE.MeshBasicMaterial({ map: LM.dashTex, toneMapped: false }));
+        s.position.set(-0.05, 0.17, 0.176); g.add(s);
+        mk(new THREE.BoxGeometry(0.4, 0.05, 0.01), LM.dark, 0, 0.05, 0.176, g);
+        g.traverse(o => { if (o.isMesh) o.castShadow = true; });
+        return g;
+    }
+    function makeTubeRack() {
+        const g = new THREE.Group();
+        mk(new THREE.BoxGeometry(0.34, 0.02, 0.1), LM.steel, 0, 0.01, 0, g);
+        const cols = [0x38bdf8, 0xf59e0b, 0x34d399, 0xef4444, 0xa78bfa];
+        for (let i = 0; i < 8; i++) mk(new THREE.CylinderGeometry(0.012, 0.012, 0.11, 8), liqMat(cols[i % cols.length]), -0.14 + i * 0.04, 0.075, 0, g);
+        return g;
+    }
+    function makeSink() {
+        const g = new THREE.Group();
+        mk(new THREE.BoxGeometry(0.7, 0.012, 0.42), LM.steel, 0, 0.006, 0.05, g);
+        mk(new THREE.BoxGeometry(0.6, 0.004, 0.32), LM.dark, 0, 0.014, 0.05, g);
+        mk(new THREE.CylinderGeometry(0.013, 0.013, 0.3, 10), LM.steel, 0, 0.15, -0.2, g);
+        const sp = mk(new THREE.CylinderGeometry(0.011, 0.011, 0.2, 10), LM.steel, 0, 0.3, -0.1, g); sp.rotation.x = Math.PI / 2;
+        return g;
+    }
+    function makeChair(x, z, rotY) {
+        const g = new THREE.Group(); g.position.set(x, 0, z); g.rotation.y = rotY || 0;
+        mk(new THREE.CylinderGeometry(0.26, 0.26, 0.07, 20), LM.plastic, 0, 0.55, 0, g);
+        const back = mk(new THREE.BoxGeometry(0.46, 0.42, 0.05), LM.plastic, 0, 0.9, 0.25, g); back.rotation.x = -0.12;
+        mk(new THREE.BoxGeometry(0.05, 0.3, 0.05), LM.steel, 0, 0.72, 0.24, g);
+        mk(new THREE.CylinderGeometry(0.03, 0.03, 0.32, 8), LM.steel, 0, 0.36, 0, g);
+        for (let i = 0; i < 5; i++) {
+            const arm = new THREE.Group(); arm.rotation.y = i * Math.PI * 2 / 5; g.add(arm);
+            mk(new THREE.BoxGeometry(0.3, 0.03, 0.05), LM.steel, 0.15, 0.16, 0, arm);
+            mk(new THREE.SphereGeometry(0.035, 8, 8), LM.dark, 0.3, 0.05, 0, arm);
+        }
+        [-0.26, 0.26].forEach(sx => {
+            mk(new THREE.BoxGeometry(0.04, 0.03, 0.26), LM.plastic, sx, 0.78, 0.02, g);
+            mk(new THREE.BoxGeometry(0.03, 0.2, 0.03), LM.steel, sx, 0.68, 0.05, g);
+        });
+        g.traverse(o => { if (o.isMesh) o.castShadow = true; });
+        scene.add(g); return g;
+    }
+    function makeStool(x, z) {
+        const g = new THREE.Group(); g.position.set(x, 0, z);
+        mk(new THREE.CylinderGeometry(0.2, 0.2, 0.06, 18), LM.plastic, 0, 0.7, 0, g);
+        mk(new THREE.CylinderGeometry(0.025, 0.025, 0.65, 8), LM.steel, 0, 0.35, 0, g);
+        mk(new THREE.CylinderGeometry(0.24, 0.24, 0.03, 18), LM.steel, 0, 0.015, 0, g);
+        g.traverse(o => { if (o.isMesh) o.castShadow = true; });
+        scene.add(g); return g;
+    }
+
+    // ---------- Montaje completo del laboratorio ----------
+    function buildRoomShellAndMaterials() { initLabMaterials(); buildRoomShell(); }
+
+    function buildLabDecor() {
+        if (!LM) return;
+        const PI = Math.PI;
+        const zs = [-7.2, -3.6, 0, 3.6, 7.2];
+
+        // Paredes laterales: muebles bajos con encimera negra
+        const lk = ['drawers', 'doors', 'drawers', 'doors', 'drawers'], rk = ['doors', 'drawers', 'drawers', 'doors', 'drawers'];
+        const L = zs.map((z, i) => baseRun(-11.45, z, PI / 2, 3.6, 0.7, lk[i], LM.topBlack));
+        const R = zs.map((z, i) => baseRun(11.45, z, -PI / 2, 3.6, 0.7, rk[i], LM.topBlack));
+        put(L[0], makeMicroscope(), -1.2, 0); put(L[0], makeMicroscope(), -0.3, 0); put(L[0], makeMonitor(), 1.1, -0.12);
+        put(L[1], makeMonitor(), -0.9, -0.12); put(L[1], makeFlask(0x38bdf8), 0.7, 0); put(L[1], makeFlask(0xf59e0b), 1.0, 0.05); put(L[1], makeBeaker(0x34d399), 1.4, 0);
+        put(L[2], makeCentrifuge(), -1.2, 0); put(L[2], makeAnalyzer(), 0.5, -0.05); put(L[2], makeFlask(0xa78bfa), 1.4, 0);
+        put(L[3], makeSink(), 0, 0); put(L[3], makeBeaker(0x38bdf8), -1.3, 0); put(L[3], makeBeaker(0xf59e0b), 1.3, 0);
+        put(L[4], makeMicroscope(), -1.0, 0); put(L[4], makeMonitor(), 0.5, -0.12); put(L[4], makeTubeRack(), 1.5, 0);
+        put(R[0], makeMonitor(), -1.0, -0.12); put(R[0], makeMicroscope(), 0.2, 0); put(R[0], makeFlask(0x34d399), 1.2, 0);
+        put(R[1], makeTubeRack(), -1.2, 0); put(R[1], makeCentrifuge(), 0.2, 0); put(R[1], makeBeaker(0xa78bfa), 1.2, 0);
+        put(R[2], makeAnalyzer(), -0.9, -0.05); put(R[2], makeMonitor(), 0.9, -0.12);
+        put(R[3], makeSink(), 0, 0); put(R[3], makeMicroscope(), -1.3, 0); put(R[3], makeBeaker(0x38bdf8), 1.3, 0);
+        put(R[4], makeMicroscope(), -1.2, 0); put(R[4], makeMicroscope(), -0.2, 0); put(R[4], makeMonitor(), 1.1, -0.12);
+
+        // Vitrinas de vidrio con reactivos (pared izquierda y derecha)
+        zs.forEach((z, i) => {
+            if (i !== 2) upperRun(-11.8 + 0.19, z, PI / 2, 3.5, 1.75, 1.5, 'glass');
+            upperRun(11.8 - 0.19, z, -PI / 2, 3.5, 1.75, 1.5, 'glass');
+        });
+        // Pantalla de datos en la pared izquierda
+        const disp = new THREE.Group(); disp.position.set(-11.74, 2.55, 0); disp.rotation.y = PI / 2; scene.add(disp);
+        mk(new THREE.BoxGeometry(3.3, 1.8, 0.05), LM.dark, 0, 0, 0, disp);
+        const dm = new THREE.Mesh(new THREE.PlaneGeometry(3.1, 1.6), new THREE.MeshBasicMaterial({ map: LM.dashTex, toneMapped: false }));
+        dm.position.z = 0.03; disp.add(dm);
+
+        // Pared trasera (a los lados del ventanal)
+        const B = [
+            baseRun(-9.9, -9.45, 0, 2.4, 0.7, 'drawers', LM.topWhite), baseRun(-7.5, -9.45, 0, 2.4, 0.7, 'doors', LM.topWhite),
+            baseRun(7.5, -9.45, 0, 2.4, 0.7, 'doors', LM.topWhite), baseRun(9.9, -9.45, 0, 2.4, 0.7, 'drawers', LM.topWhite)
+        ];
+        put(B[0], makeMonitor(), 0, -0.12); put(B[0], makeFlask(0x38bdf8), 0.9, 0);
+        put(B[1], makeMicroscope(), -0.6, 0); put(B[1], makeCentrifuge(), 0.5, 0);
+        put(B[2], makeMonitor(), -0.4, -0.12); put(B[2], makeMicroscope(), 0.7, 0);
+        put(B[3], makeAnalyzer(), -0.4, -0.05); put(B[3], makeBeaker(0xf59e0b), 0.8, 0);
+        openShelf(-8.7, -9.64, 0, 4.7, 1.75);
+        upperRun(7.5, -9.61, 0, 2.35, 1.75, 1.5, 'white'); upperRun(9.9, -9.61, 0, 2.35, 1.75, 1.5, 'white');
+
+        // Pared frontal: muebles a la izquierda, pizarra al centro, puerta a la derecha
+        const F = [baseRun(-9.9, 9.5, PI, 2.4, 0.6, 'drawers', LM.topWhite), baseRun(-7.5, 9.5, PI, 2.4, 0.6, 'doors', LM.topWhite)];
+        put(F[0], makeMonitor(), 0, -0.1); put(F[0], makeBeaker(0x38bdf8), 0.9, 0);
+        put(F[1], makeTubeRack(), -0.5, 0); put(F[1], makeFlask(0xf59e0b), 0.6, 0);
+        [[-9.9, 'SEGURIDAD', 'Usa bata y gafas\nsiempre en el\nlaboratorio', '#dc2626'], [-7.5, 'ORDEN', 'Deja tu mesa\nlimpia al\nterminar', '#0ea5e9']].forEach(p => {
+            const m = new THREE.Mesh(new THREE.PlaneGeometry(1.1, 1.55), new THREE.MeshStandardMaterial({ map: texFromCanvas(posterCanvas(p[1], p[2], p[3])), roughness: 0.6 }));
+            m.position.set(p[0], 3.2, 9.77); m.rotation.y = PI; scene.add(m);
+        });
+        const panel = new THREE.Group(); panel.position.set(0, 0, 9.75); panel.rotation.y = PI; scene.add(panel);
+        mk(new THREE.BoxGeometry(9, 4.3, 0.06), new THREE.MeshStandardMaterial({ color: 0x16324f, roughness: 0.6 }), 0, 3.6, 0, panel);
+        const wb = new THREE.Mesh(new THREE.PlaneGeometry(7.2, 3.6), new THREE.MeshBasicMaterial({ map: texFromCanvas(cvs(1024, 512, drawBoard)), toneMapped: false }));
+        wb.position.set(0, 3.6, 0.04); panel.add(wb);
+        mk(new THREE.BoxGeometry(5, 0.04, 0.12), LM.steel, 0, 1.78, 0.07, panel);
+        const door = new THREE.Group(); door.position.set(9, 0, 9.74); door.rotation.y = PI; scene.add(door);
+        mk(new THREE.BoxGeometry(1.9, 3.3, 0.1), LM.steel, 0, 1.65, 0, door);
+        mk(new THREE.BoxGeometry(1.64, 3.1, 0.08), LM.doorMat, 0, 1.55, 0.03, door);
+        const dw = new THREE.Mesh(new THREE.PlaneGeometry(0.5, 1.2), new THREE.MeshStandardMaterial({ color: 0x9cc3da, roughness: 0.1, transparent: true, opacity: 0.7 }));
+        dw.position.set(0, 2.1, 0.075); door.add(dw);
+        mk(new THREE.BoxGeometry(0.05, 0.6, 0.06), LM.steel, 0.65, 1.1, 0.1, door);
+        const sg = new THREE.Mesh(new THREE.PlaneGeometry(0.8, 0.25), new THREE.MeshBasicMaterial({ map: texFromCanvas(exitCanvas()), toneMapped: false }));
+        sg.position.set(0, 3.55, 0.06); door.add(sg);
+        const clock = new THREE.Mesh(new THREE.CircleGeometry(0.4, 40), new THREE.MeshBasicMaterial({ map: texFromCanvas(clockCanvas()), transparent: true, toneMapped: false }));
+        clock.position.set(6.2, 5.7, 9.77); clock.rotation.y = PI; scene.add(clock);
+
+        // Isla de trabajo central con microscopios y banquetas
+        const I = baseRun(0, -5.5, 0, 5.0, 1.2, 'drawers', LM.topWhite);
+        put(I, makeMicroscope(), -1.8, 0.1); put(I, makeMicroscope(), -0.9, 0.1); put(I, makeMonitor(), 0.5, -0.2);
+        put(I, makeTubeRack(), 1.7, 0.2); put(I, makeFlask(0x34d399), 2.1, 0.2); put(I, makeBeaker(0xf59e0b), 1.3, -0.3);
+        makeStool(-1.4, -4.35); makeStool(0.2, -4.35); makeStool(1.8, -4.35);
+
+        // Sillas (como en las fotos) alrededor de las mesas de trabajo
+        makeChair(-5.3, 2.5, 0); makeChair(-2.7, 2.5, 0); makeChair(2.8, 2.5, 0); makeChair(6.0, 2.5, 0);
+
+        // Campana extractora en el techo
+        mk(new THREE.CylinderGeometry(0.28, 0.28, 1.6, 20), LM.steel, 7.5, 7.2, 5.5, scene);
+        mk(new THREE.CylinderGeometry(0.28, 0.8, 0.5, 24), LM.steel, 7.5, 6.15, 5.5, scene);
+
+        // Líneas amarillas de seguridad alrededor de las dos mesas
+        const yel = new THREE.MeshBasicMaterial({ color: 0xfacc15 });
+        [[-4, 0], [4, 0]].forEach(c => {
+            mk(new THREE.BoxGeometry(5.8, 0.012, 0.06), yel, c[0], 0.006, 1.9, scene); mk(new THREE.BoxGeometry(5.8, 0.012, 0.06), yel, c[0], 0.006, -1.9, scene);
+            mk(new THREE.BoxGeometry(0.06, 0.012, 3.8), yel, c[0] - 2.9, 0.006, 0, scene); mk(new THREE.BoxGeometry(0.06, 0.012, 3.8), yel, c[0] + 2.9, 0.006, 0, scene);
+        });
+    }
+
+    // =====================================================
+    // MOVIMIENTO EN PRIMERA PERSONA (W A S D)
+    // =====================================================
+    const player = { pos: null, yaw: 0, pitch: 0, eye: 1.7 };
+    const keys = {};
+    let lastT = performance.now(), bobPhase = 0, playerReady = false;
+    const LAB_COLLIDERS = [[-6.9, -1.1, -1.9, 1.9], [1.1, 6.9, -1.9, 1.9], [-2.9, 2.9, -6.5, -4.5]];
+    const LAB_BOUNDS = { x0: -10.5, x1: 10.5, z0: -8.7, z1: 8.9 };
+    const MOVE_KEYS = ['KeyW', 'KeyA', 'KeyS', 'KeyD', 'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', 'ShiftLeft', 'ShiftRight'];
+
+    function labBlocked(x, z) {
+        if (x < LAB_BOUNDS.x0 || x > LAB_BOUNDS.x1 || z < LAB_BOUNDS.z0 || z > LAB_BOUNDS.z1) return true;
+        return LAB_COLLIDERS.some(c => x > c[0] && x < c[1] && z > c[2] && z < c[3]);
+    }
+    function lookAngles(p, t) {
+        const dx = t[0] - p[0], dy = t[1] - p[1], dz = t[2] - p[2];
+        return { yaw: Math.atan2(-dx, -dz), pitch: Math.atan2(dy, Math.hypot(dx, dz)) };
+    }
+    function applyCamera(bobY) {
+        camera.position.set(player.pos.x, player.pos.y + (bobY || 0), player.pos.z);
+        camera.rotation.order = 'YXZ';
+        camera.rotation.set(player.pitch, player.yaw, 0);
+    }
+    function typingTarget(e) {
+        const t = e.target; if (!t || !t.tagName) return false;
+        const n = t.tagName;
+        return n === 'TEXTAREA' || n === 'SELECT' || (n === 'INPUT' && t.type !== 'range' && t.type !== 'checkbox');
+    }
+    function onKeyDown(e) {
+        if (!scene || typingTarget(e) || e.ctrlKey || e.metaKey || e.altKey) return;
+        if (!$('student-modal').classList.contains('hidden') || !$('analysis-modal').classList.contains('hidden')) return;
+        if (MOVE_KEYS.indexOf(e.code) < 0) return;
+        if (e.target && e.target.type === 'range' && e.code.indexOf('Arrow') === 0) return;
+        keys[e.code] = true;
+        if (e.code.indexOf('Arrow') === 0) e.preventDefault();
+    }
+    function onKeyUp(e) { delete keys[e.code]; }
+    function initPlayer() {
+        player.pos = new THREE.Vector3(0, 1.7, 8.3);
+        const a = lookAngles([0, 1.7, 8.3], [0, 2.6, 0]); player.yaw = a.yaw; player.pitch = a.pitch;
+        applyCamera(0);
+        if (playerReady) return;
+        playerReady = true;
+        window.addEventListener('keydown', onKeyDown);
+        window.addEventListener('keyup', onKeyUp);
+        window.addEventListener('blur', () => { for (const k in keys) delete keys[k]; });
+        document.addEventListener('change', e => {
+            const t = e.target;
+            if (t && (t.tagName === 'SELECT' || (t.tagName === 'INPUT' && (t.type === 'range' || t.type === 'checkbox')))) t.blur();
+        });
+        setTimeout(() => showToast('Camina con W A S D · arrastra el mouse para mirar · Shift corre', 'ok'), 3200);
+    }
+    function tryMove(dx, dz) {
+        const nx = player.pos.x + dx, nz = player.pos.z + dz;
+        if (!labBlocked(nx, nz) || labBlocked(player.pos.x, player.pos.z)) { player.pos.x = nx; player.pos.z = nz; }
+    }
+    function updatePlayer() {
+        if (!camera || !player.pos) return;
+        const now = performance.now(), dt = Math.min(0.05, (now - lastT) / 1000); lastT = now;
+        let bobY = 0;
+        if ($('analysis-modal').classList.contains('hidden')) {
+            const turn = (keys.ArrowLeft ? 1 : 0) - (keys.ArrowRight ? 1 : 0);
+            if (turn) { player.yaw += turn * 1.9 * dt; camAnimId++; }
+            const f = ((keys.KeyW || keys.ArrowUp) ? 1 : 0) - ((keys.KeyS || keys.ArrowDown) ? 1 : 0);
+            const s = (keys.KeyD ? 1 : 0) - (keys.KeyA ? 1 : 0);
+            if (f || s) {
+                camAnimId++;
+                const run = keys.ShiftLeft || keys.ShiftRight, sp = (run ? 5.4 : 3.1) * dt;
+                const fx = -Math.sin(player.yaw), fz = -Math.cos(player.yaw), rx = Math.cos(player.yaw), rz = -Math.sin(player.yaw);
+                let mx = fx * f + rx * s, mz = fz * f + rz * s;
+                const len = Math.hypot(mx, mz) || 1; mx = mx / len * sp; mz = mz / len * sp;
+                tryMove(mx, 0); tryMove(0, mz);
+                bobPhase += dt * (run ? 11 : 8);
+                player.pos.y += (player.eye - player.pos.y) * Math.min(1, 5 * dt);
+                bobY = Math.sin(bobPhase) * 0.025;
+            }
+        }
+        applyCamera(bobY);
+    }
+
+    function onWindowResize() {
+        camera.aspect = window.innerWidth / window.innerHeight; camera.updateProjectionMatrix();
+        renderer.setSize(window.innerWidth, window.innerHeight);
+        if (!$('analysis-modal').classList.contains('hidden')) drawModalChart();
+    }
+    window.addEventListener('keydown', e => { if (e.key === 'Escape') closeAnalysisModal(); });
+
+    // =====================================================
+    // LOOP DE ANIMACIÓN
+    // =====================================================
+    function animate() {
+        requestAnimationFrame(animate);
+        updatePlayer();
+
+        // Sonda suavizada + cable
+        if (probeMesh) {
+            probeMesh.position.y += (probeTargetY - probeMesh.position.y) * 0.18;
+            const len = Math.max(0.05, PROBE_TOP_Y - (probeMesh.position.y + 0.1));
+            cableMesh.scale.set(1, len, 1);
+            cableMesh.position.y = probeMesh.position.y + 0.1 + len / 2;
+        }
+        // Panel digital mira a la cámara
+        if (gaugeMesh) gaugeMesh.rotation.y = Math.atan2(camera.position.x - gaugeMesh.position.x, camera.position.z - gaugeMesh.position.z);
+        // Resplandor del botón
+        if (btnMat) {
+            const base = hovered === 'report' ? 1.4 : 0.7;
+            btnMat.emissiveIntensity = base + Math.sin(performance.now() / 350) * 0.2;
+        }
+        // La Tierra gira en el cielo lunar
+        if (outsideGroup) outsideGroup.children.forEach(c => { if (c.userData.spin) c.rotation.y += 0.0008; });
+
+        renderer.render(scene, camera);
+    }
+    </script>
+</body>
+</html>
