@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Laboratorio Virtual 3D - Mecánica de Fluidos</title>
-    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="tailwind.css">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
 
@@ -19,6 +19,10 @@
         ::-webkit-scrollbar-thumb { background: rgba(59,130,246,0.5); border-radius: 3px; }
         input, select, button { user-select: auto; }
         #toast { transition: opacity .3s, transform .3s; }
+        .adv-body > * + * { margin-top: 10px; }
+        details > summary { list-style: none; }
+        details > summary::-webkit-details-marker { display: none; }
+        #live-chart { width: 100%; height: 140px; display: block; }
     </style>
 
     <!-- Three.js -->
@@ -152,6 +156,19 @@
                     </select>
                 </div>
 
+                <div id="altitude-box" class="space-y-1">
+                    <label class="text-xs font-semibold text-slate-300 flex justify-between"><span>Altitud del laboratorio (cambia P₀):</span><span id="label-alt-val" class="text-amber-400 font-bold">0 m s. n. m.</span></label>
+                    <select id="select-altitude" onchange="updateAltitude()" class="w-full bg-slate-900 border border-slate-700 rounded-xl py-2 px-3 text-xs text-white focus:outline-none focus:border-blue-500">
+                        <option value="0" selected>🏖️ Lima · nivel del mar (0 m)</option>
+                        <option value="2335">Arequipa (2335 m)</option>
+                        <option value="3259">Huancayo (3259 m)</option>
+                        <option value="3399">Cusco (3399 m)</option>
+                        <option value="3827">Puno (3827 m)</option>
+                        <option value="4330">Cerro de Pasco (4330 m)</option>
+                        <option value="8849">Cima del Everest (8849 m)</option>
+                    </select>
+                </div>
+
                 <div class="space-y-1">
                     <label class="text-xs font-semibold text-slate-300 flex justify-between"><span>Fluido de trabajo:</span><span id="label-density-val" class="text-cyan-400 font-bold">1000 kg/m³</span></label>
                     <select id="select-fluid" onchange="updateFluid()" class="w-full bg-slate-900 border border-slate-700 rounded-xl py-2 px-3 text-xs text-white focus:outline-none focus:border-blue-500">
@@ -162,6 +179,54 @@
                         <option value="mercury">🔘 Mercurio líquido (13600 kg/m³)</option>
                     </select>
                 </div>
+
+                <details id="adv-box" class="glass-card rounded-xl p-2.5">
+                    <summary class="text-xs font-semibold text-slate-300 cursor-pointer flex items-center justify-between"><span><i class="fa-solid fa-layer-group text-indigo-400 mr-1.5"></i>Opciones avanzadas</span><span class="text-[10px] text-slate-500 font-normal">capas · temperatura · comparar</span></summary>
+                    <div class="adv-body mt-3">
+                        <div class="space-y-1">
+                            <label class="text-xs font-semibold text-slate-300 flex justify-between"><span>Capa superior inmiscible:</span><span id="label-layer-val" class="text-indigo-300 font-bold">sin capa</span></label>
+                            <select id="select-layer" onchange="updateLayer()" class="w-full bg-slate-900 border border-slate-700 rounded-xl py-2 px-3 text-xs text-white focus:outline-none focus:border-blue-500">
+                                <option value="none" selected>— Sin capa (un solo fluido)</option>
+                                <option value="water">💧 Agua pura</option>
+                            <option value="oil">🛢️ Aceite industrial</option>
+                            <option value="glycerin">🧪 Glicerina</option>
+                            <option value="alcohol">🍷 Etanol</option>
+                            <option value="mercury">🔘 Mercurio líquido</option>
+                            </select>
+                        </div>
+                        <div id="layer-thick-box" class="hidden space-y-1">
+                            <div class="flex justify-between items-center text-[11px] text-slate-400"><span>Espesor de la capa superior</span><span id="label-layer-thick" class="text-indigo-300 font-mono font-bold">1.0 m</span></div>
+                            <input type="range" id="slider-layer" min="0.5" max="3" step="0.1" value="1" oninput="updateLayer()" class="w-full h-2 bg-slate-800 rounded-lg appearance-none cursor-pointer accent-blue-500">
+                            <div class="text-[10px] text-slate-500">La capa superior debe ser menos densa que el fluido de trabajo (que queda abajo).</div>
+                        </div>
+
+                        <div class="space-y-1">
+                            <label class="flex items-center justify-between text-xs font-semibold text-slate-300 cursor-pointer">
+                                <span class="flex items-center gap-2"><input type="checkbox" id="chk-temp" onchange="updateTemp()" class="accent-blue-500"><span>Variar ρ con la temperatura</span></span>
+                                <span id="label-temp-val" class="text-rose-300 font-bold">T nominal (20 °C)</span>
+                            </label>
+                            <input type="range" id="slider-temp" min="5" max="70" step="1" value="20" disabled oninput="updateTemp()" class="w-full h-2 bg-slate-800 rounded-lg appearance-none cursor-pointer accent-blue-500 disabled:opacity-40">
+                        </div>
+
+                        <div class="space-y-1">
+                            <label class="text-xs font-semibold text-slate-300 flex justify-between"><span>Comparar con otro fluido:</span><span class="text-amber-400 font-bold">modo comparativo</span></label>
+                            <select id="select-compare" onchange="updateCompare()" class="w-full bg-slate-900 border border-slate-700 rounded-xl py-2 px-3 text-xs text-white focus:outline-none focus:border-blue-500">
+                                <option value="none" selected>— Sin comparación</option>
+                                <option value="water">💧 Agua pura</option>
+                            <option value="oil">🛢️ Aceite industrial</option>
+                            <option value="glycerin">🧪 Glicerina</option>
+                            <option value="alcohol">🍷 Etanol</option>
+                            <option value="mercury">🔘 Mercurio líquido</option>
+                            </select>
+                            <div class="text-[10px] text-slate-500">Superpone la 2.ª curva P–h y «Registrar dato» guarda ambos fluidos a la misma h.</div>
+                        </div>
+
+                        <label class="flex items-center gap-2 text-[11px] text-slate-300 cursor-pointer">
+                            <input type="checkbox" id="chk-marks" checked onchange="toggleDepthMarks()" class="accent-blue-500">
+                            <span>Marcas de profundidad dentro del tanque (cada 0.5 m)</span>
+                        </label>
+                    </div>
+                </details>
 
                 <div class="space-y-1">
                     <div class="flex justify-between items-center text-xs">
@@ -182,10 +247,16 @@
                     </div>
                 </div>
 
+                <div class="glass-card p-2 rounded-xl">
+                    <div class="flex justify-between items-center text-[10px] text-slate-400 uppercase tracking-wider mb-1"><span>Gradiente P–h en tiempo real</span><span class="normal-case text-slate-500">arrastra la sonda</span></div>
+                    <canvas id="live-chart"></canvas>
+                </div>
+
                 <label class="flex items-center gap-2 text-[11px] text-slate-300 cursor-pointer">
-                    <input type="checkbox" id="chk-noise" checked class="accent-blue-500">
+                    <input type="checkbox" id="chk-noise" checked onchange="updateHudStats()" class="accent-blue-500">
                     <span>Ruido de sensor realista (la regresión no será perfecta)</span>
                 </label>
+                <div id="hud-fit-stats" class="glass-card p-2.5 rounded-xl text-[11px] text-slate-300 font-mono"></div>
 
                 <div class="grid grid-cols-2 gap-2">
                     <button onclick="recordDataPoint()" class="py-2.5 px-3 bg-blue-600 hover:bg-blue-500 text-white font-medium rounded-xl text-xs shadow-lg shadow-blue-600/20 transition flex items-center justify-center gap-1.5"><i class="fa-solid fa-plus-circle"></i><span>Registrar dato</span></button>
@@ -248,19 +319,20 @@
                 <div>
                     <h4 class="text-xs font-bold text-slate-200 uppercase tracking-wider mb-2">Resultados de la regresión y comparación de pendientes ρ·g</h4>
                     <div class="border border-slate-700/60 rounded-xl overflow-x-auto">
-                        <table class="w-full text-xs text-left min-w-[760px]">
+                        <table class="w-full text-xs text-left min-w-[860px]">
                             <thead class="bg-slate-900/90 text-slate-400 border-b border-slate-700/60">
                                 <tr>
                                     <th class="p-2.5">Fluido · Planeta</th><th class="p-2.5">n</th>
                                     <th class="p-2.5">Pend. exp. (Pa/m)</th><th class="p-2.5">ρ·g teórica (Pa/m)</th>
-                                    <th class="p-2.5">ρ exp. (kg/m³)</th><th class="p-2.5">Error ρ (%)</th>
+                                    <th class="p-2.5">ρ exp. (kg/m³)</th><th class="p-2.5">ρ teór. (kg/m³)</th><th class="p-2.5">Error relativo ρ (%)</th>
                                     <th class="p-2.5">P₀ exp. (kPa)</th><th class="p-2.5">R²</th>
                                 </tr>
                             </thead>
                             <tbody id="table-results-body" class="divide-y divide-slate-800 font-mono text-slate-200"></tbody>
                         </table>
                     </div>
-                    <p class="text-[11px] text-slate-500 mt-2">Se necesitan al menos 2 lecturas con profundidades distintas por combinación fluido/planeta para ajustar la recta.</p>
+                    <p class="text-[11px] text-slate-500 mt-2">Se necesitan al menos 2 lecturas con profundidades distintas por combinación fluido/planeta para ajustar la recta. Con capa superior, cada capa se ajusta por separado (la pendiente cambia al cruzar la interfaz).</p>
+                    <p class="text-[11px] text-cyan-300 mt-1 font-mono">Error relativo (%) = | ρ_exp − ρ_teórico | / ρ_teórico × 100 &nbsp;·&nbsp; ρ_exp = pendiente / g</p>
                 </div>
             </div>
 
@@ -308,6 +380,58 @@
     const TANK_SURFACE_Y = 3.5;   // altura de la superficie dentro del grupo del tanque
     const PROBE_TOP_Y = 4.0;      // altura de la viga de la sonda
 
+    // ---- Mejoras: altitud, temperatura, capas, modo comparativo ----
+    let currentAltM = 0;                       // altitud (solo afecta a la Tierra)
+    let tempOn = false, currentTemp = 20;      // ρ(T) opcional
+    let layerFluidKey = 'none', layerThickness = 1.0;   // capa superior inmiscible
+    let compareKey = 'none';                   // 2.º fluido para comparar
+    let showMarks = true;
+
+    const BETA = { oil: 7.0e-4, glycerin: 5.0e-4, alcohol: 1.1e-3, mercury: 1.81e-4 };   // dilatación volumétrica (1/°C)
+    const kellWater = T => (999.83952 + 16.945176 * T - 7.9870401e-3 * T * T - 46.170461e-6 * T ** 3 + 105.56302e-9 * T ** 4 - 280.54253e-12 * T ** 5) / (1 + 16.87985e-3 * T);
+    // Densidad nominal a 20 °C; si T es null se usa el valor nominal de la tabla
+    function fluidRho(fk, T) {
+        const f = FLUIDS[fk];
+        if (T == null) return f.density;
+        if (fk === 'water') return f.density * kellWater(T) / kellWater(20);
+        return f.density * (1 - BETA[fk] * (T - 20));
+    }
+    const curT = () => (tempOn ? currentTemp : null);
+    // Atmósfera estándar: P = 101.325·(1 − 2.25577e-5·h)^5.25588  (h en m)
+    const baroP0 = altM => 101.325 * Math.pow(1 - 2.25577e-5 * altM, 5.25588);
+    const planetP0 = key => (key === 'earth' ? baroP0(currentAltM) : PLANETS[key].p0);
+    const fmtP = v => +v.toFixed(3);
+
+    // Estado actual del experimento
+    function envState() {
+        const pl = PLANETS[currentPlanetKey], T = curT();
+        const layer = layerFluidKey !== 'none' ? { fk: layerFluidKey, rho: fluidRho(layerFluidKey, T), t: layerThickness } : null;
+        return { pl, g: pl.g, T, p0: planetP0(currentPlanetKey), rho: fluidRho(currentFluidKey, T), layer, altM: currentPlanetKey === 'earth' ? currentAltM : 0 };
+    }
+    // Presión manométrica (kPa) a profundidad h. Con capa: gradiente ρ1·g hasta t y ρ2·g después.
+    function gaugeAt(h, rho, layer, g) {
+        if (!layer) return rho * g * h / 1000;
+        if (h <= layer.t) return layer.rho * g * h / 1000;
+        return (layer.rho * g * layer.t + rho * g * (h - layer.t)) / 1000;
+    }
+    // Lecturas antiguas (sin campos nuevos) siguen funcionando
+    const recP0 = d => (d.p0 != null ? d.p0 : PLANETS[d.planetKey].p0);
+    const recRho = d => (d.rho != null ? d.rho : FLUIDS[d.fluidKey].density);
+    const recFluidTxt = d => (d.layer ? `${FLUIDS[d.layer.fk].name} / ${FLUIDS[d.fluidKey].name}` : FLUIDS[d.fluidKey].name);
+    const recLabel = d => `${recFluidTxt(d)} · ${PLANETS[d.planetKey].name}`;
+    function recCond(d) {
+        const p = [];
+        if (d.planetKey === 'earth' && d.altM > 0) p.push(`${d.altM} m s. n. m.`);
+        if (d.T != null) p.push(`${d.T} °C`);
+        if (d.layer) p.push(`capa sup. ${d.layer.t} m`);
+        return p.join(', ');
+    }
+    function layerValid() {
+        if (layerFluidKey === 'none') return true;
+        return fluidRho(layerFluidKey, curT()) < fluidRho(currentFluidKey, curT()) - 1e-9;
+    }
+    const cfgKey = (pk, fk, altM, T, lay) => [pk, fk, altM || 0, T == null ? 'x' : T, lay ? lay.fk + '@' + lay.t : '-'].join('|');
+
     let studentProfile = { name: "", code: "", section: "", course: "Mecánica de Fluidos y Física Aplicada" };
     let currentPlanetKey = 'earth';
     let currentFluidKey = 'water';
@@ -323,6 +447,7 @@
     let probeTargetY = TANK_SURFACE_Y;
     let gaugePanel, gaugeMesh, signPanel, monitorPanel, monitorTex;
     let btnMesh, btnMat;
+    let topFluidMesh, interfaceMesh, depthMarksGroup;
     let interactives = [];
     let hovered = null;
 
@@ -397,6 +522,7 @@
         $('hud-student-info').innerText = `${name} (${code}) · Sec: ${section}`;
 
         if (!scene) initThreeJS();
+        updateTankFluids(); toggleDepthMarks();
         updatePlanetEnvironment(true);
         updateCalculations();
         refreshMonitor();
@@ -504,6 +630,31 @@
         fluidMesh = new THREE.Mesh(new THREE.CylinderGeometry(1.15, 1.15, 3.5, 40),
             new THREE.MeshStandardMaterial({ color: FLUIDS.water.color, transparent: true, opacity: FLUIDS.water.opacity, roughness: 0.2 }));
         fluidMesh.position.y = 1.75; tankGroup.add(fluidMesh);
+
+        // Capa superior (fluido inmiscible) e interfaz
+        topFluidMesh = new THREE.Mesh(new THREE.CylinderGeometry(1.15, 1.15, 3.5, 40),
+            new THREE.MeshStandardMaterial({ color: FLUIDS.oil.color, transparent: true, opacity: FLUIDS.oil.opacity, roughness: 0.2 }));
+        topFluidMesh.visible = false; tankGroup.add(topFluidMesh);
+        interfaceMesh = new THREE.Mesh(new THREE.CircleGeometry(1.15, 40),
+            new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.35, side: THREE.DoubleSide, depthWrite: false }));
+        interfaceMesh.rotation.x = -Math.PI / 2; interfaceMesh.visible = false; tankGroup.add(interfaceMesh);
+
+        // Marcas de profundidad dentro del tanque (cada 0.5 m, 0 m = superficie)
+        depthMarksGroup = new THREE.Group();
+        for (let i = 1; i <= 6; i++) {
+            const d = i * 0.5, y = TANK_SURFACE_Y - d;
+            const ring = new THREE.Mesh(new THREE.TorusGeometry(1.165, 0.009, 6, 72), new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.55 }));
+            ring.rotation.x = Math.PI / 2; ring.position.y = y; depthMarksGroup.add(ring);
+            const lab = makePanel(128, 48, (ctx, w, h) => {
+                ctx.fillStyle = 'rgba(15,23,42,0.85)'; roundRect(ctx, 2, 2, w - 4, h - 4, 10); ctx.fill();
+                ctx.fillStyle = '#f8fafc'; ctx.font = 'bold 26px Inter, sans-serif'; ctx.textAlign = 'center'; ctx.fillText(d.toFixed(1) + ' m', w / 2, 33);
+            });
+            const lm = new THREE.Mesh(new THREE.PlaneGeometry(0.4, 0.15), new THREE.MeshBasicMaterial({ map: lab.tex, transparent: true, toneMapped: false, depthWrite: false, side: THREE.DoubleSide }));
+            const phi = -0.75;
+            lm.position.set(1.19 * Math.sin(phi), y + 0.09, 1.19 * Math.cos(phi)); lm.rotation.y = phi;
+            depthMarksGroup.add(lm);
+        }
+        tankGroup.add(depthMarksGroup);
 
         // Regla graduada (0 m en la superficie, 3.5 m en el fondo)
         const ruler = makePanel(128, 1024, (ctx, w, h) => {
@@ -685,7 +836,7 @@
         ctx.fillStyle = '#0f172a'; ctx.fillRect(0, 0, w, h);
         ctx.strokeStyle = '#38bdf8'; ctx.lineWidth = 6; ctx.strokeRect(4, 4, w - 8, h - 8);
         ctx.textAlign = 'center';
-        const t1 = `ESTACIÓN: ${p.name.toUpperCase()}`, t2 = `g = ${p.g} m/s²   ·   P₀ = ${p.p0} kPa`, t3 = p.note;
+        const t1 = `ESTACIÓN: ${p.name.toUpperCase()}`, t2 = `g = ${p.g} m/s²   ·   P₀ = ${fmtP(planetP0(currentPlanetKey))} kPa`, t3 = (currentPlanetKey === 'earth' && currentAltM > 0) ? `Altitud ${currentAltM} m s. n. m. (atmósfera estándar)` : p.note;
         ctx.fillStyle = '#fbbf24'; fit(t1, 'bold', w - 80, 64); ctx.fillText(t1, w / 2, 68);
         ctx.fillStyle = '#e2e8f0'; fit(t2, '600', w - 80, 38); ctx.fillText(t2, w / 2, 112);
         ctx.fillStyle = '#94a3b8'; fit(t3, '400', w - 80, 30); ctx.fillText(t3, w / 2, 152);
@@ -696,24 +847,28 @@
     // CÁLCULOS HIDROSTÁTICOS EN TIEMPO REAL
     // =====================================================
     function updateCalculations() {
-        const planet = PLANETS[currentPlanetKey], fluid = FLUIDS[currentFluidKey];
-        const pGaugeKPa = fluid.density * planet.g * currentProbeDepth / 1000;
-        const pAbsKPa = planet.p0 + pGaugeKPa;
+        const s = envState();
+        const pGaugeKPa = gaugeAt(currentProbeDepth, s.rho, s.layer, s.g);
+        const pAbsKPa = s.p0 + pGaugeKPa;
         $('readout-gauge-p').innerText = `${pGaugeKPa.toFixed(2)} kPa`;
         $('readout-absolute-p').innerText = `${pAbsKPa.toFixed(2)} kPa`;
         probeTargetY = TANK_SURFACE_Y - currentProbeDepth;
         drawGauge(pGaugeKPa, pAbsKPa);
+        drawLiveChart();
+        updateHudStats();
     }
     function drawGauge(pg, pa) {
         if (!gaugePanel) return;
         const ctx = gaugePanel.ctx, w = gaugePanel.w, h = gaugePanel.h;
-        const planet = PLANETS[currentPlanetKey], fluid = FLUIDS[currentFluidKey];
+        const s = envState(), planet = s.pl;
+        const fluidTxt = s.layer ? `${FLUIDS[s.layer.fk].name} / ${FLUIDS[currentFluidKey].name}` : FLUIDS[currentFluidKey].name;
+        const params = s.layer ? `g=${planet.g}` : `ρ=${Math.round(s.rho)}, g=${planet.g}`;
         ctx.clearRect(0, 0, w, h);
         ctx.fillStyle = 'rgba(15,23,42,0.92)'; roundRect(ctx, 6, 6, w - 12, h - 12, 26); ctx.fill();
         ctx.strokeStyle = '#38bdf8'; ctx.lineWidth = 4; ctx.stroke();
         ctx.textAlign = 'left';
         ctx.fillStyle = '#94a3b8'; ctx.font = '600 26px Inter, sans-serif';
-        ctx.fillText(`${fluid.name} · ${planet.name}  (ρ=${fluid.density}, g=${planet.g})`, 30, 52);
+        ctx.fillText(`${fluidTxt} · ${planet.name}  (${params})`, 30, 52);
         ctx.fillStyle = '#34d399'; ctx.font = 'bold 54px Inter, sans-serif';
         ctx.fillText(`h = ${currentProbeDepth.toFixed(2)} m`, 30, 120);
         ctx.fillStyle = '#e2e8f0'; ctx.font = 'bold 42px Inter, sans-serif';
@@ -726,19 +881,161 @@
     function updatePlanetEnvironment(skipRebuild) {
         currentPlanetKey = $('select-planet').value;
         const planet = PLANETS[currentPlanetKey];
+        $('altitude-box').classList.toggle('hidden', currentPlanetKey !== 'earth');
         $('label-gravity-val').innerText = `${planet.g} m/s²`;
-        $('label-p0-val').innerText = `${planet.p0} kPa`;
+        $('label-p0-val').innerText = `${fmtP(planetP0(currentPlanetKey))} kPa`;
         if (scene) buildOutside(currentPlanetKey);
         updateCalculations();
+    }
+    function updateAltitude() {
+        currentAltM = parseFloat($('select-altitude').value) || 0;
+        $('label-alt-val').innerText = `${currentAltM} m s. n. m.`;
+        $('label-p0-val').innerText = `${fmtP(planetP0(currentPlanetKey))} kPa`;
+        if (scene) drawSign();
+        updateCalculations();
+    }
+    function refreshDensityLabel() {
+        const rho = fluidRho(currentFluidKey, curT());
+        $('label-density-val').innerText = `${tempOn ? rho.toFixed(1) : rho} kg/m³`;
     }
     function updateFluid() {
         currentFluidKey = $('select-fluid').value;
         const fluid = FLUIDS[currentFluidKey];
-        $('label-density-val').innerText = `${fluid.density} kg/m³`;
+        refreshDensityLabel();
         if (fluidMesh) { fluidMesh.material.color.setHex(fluid.color); fluidMesh.material.opacity = fluid.opacity; }
+        if (compareKey === currentFluidKey) { compareKey = 'none'; $('select-compare').value = 'none'; }
         drawSign();
+        updateLayer();
+    }
+    function updateTemp() {
+        tempOn = $('chk-temp').checked;
+        currentTemp = parseFloat($('slider-temp').value);
+        $('slider-temp').disabled = !tempOn;
+        $('label-temp-val').innerText = tempOn ? `T = ${currentTemp} °C` : 'T nominal (20 °C)';
+        refreshDensityLabel();
+        updateLayer();
+    }
+    function updateLayer() {
+        layerFluidKey = $('select-layer').value;
+        layerThickness = parseFloat($('slider-layer').value);
+        if (!layerValid()) {
+            showToast(`${FLUIDS[layerFluidKey].name} no puede flotar sobre ${FLUIDS[currentFluidKey].name} (es más denso)`, 'error');
+            layerFluidKey = 'none'; $('select-layer').value = 'none';
+        }
+        const on = layerFluidKey !== 'none';
+        $('layer-thick-box').classList.toggle('hidden', !on);
+        $('label-layer-thick').innerText = `${layerThickness.toFixed(1)} m`;
+        $('label-layer-val').innerText = on ? `${FLUIDS[layerFluidKey].name} · ${layerThickness.toFixed(1)} m` : 'sin capa';
+        $('select-compare').disabled = on;
+        if (on && compareKey !== 'none') { compareKey = 'none'; $('select-compare').value = 'none'; }
+        updateTankFluids();
         updateCalculations();
     }
+    function updateCompare() {
+        compareKey = $('select-compare').value;
+        if (compareKey === currentFluidKey) {
+            compareKey = 'none'; $('select-compare').value = 'none';
+            showToast('Elige un fluido distinto al fluido de trabajo para comparar', 'error');
+        }
+        drawLiveChart();
+        updateHudStats();
+    }
+    function toggleDepthMarks() {
+        showMarks = $('chk-marks').checked;
+        if (depthMarksGroup) depthMarksGroup.visible = showMarks;
+    }
+    // Altura y color de las dos capas de fluido dentro del tanque
+    function updateTankFluids() {
+        if (!fluidMesh) return;
+        const H = 3.5, t = layerThickness;
+        if (layerFluidKey !== 'none') {
+            const lf = FLUIDS[layerFluidKey];
+            fluidMesh.scale.y = (H - t) / H; fluidMesh.position.y = (H - t) / 2;
+            topFluidMesh.visible = true; topFluidMesh.material.color.setHex(lf.color); topFluidMesh.material.opacity = lf.opacity;
+            topFluidMesh.scale.y = t / H; topFluidMesh.position.y = H - t / 2;
+            interfaceMesh.visible = true; interfaceMesh.position.y = H - t;
+        } else {
+            fluidMesh.scale.y = 1; fluidMesh.position.y = 1.75;
+            topFluidMesh.visible = false; interfaceMesh.visible = false;
+        }
+    }
+
+    // ---------- Gráfica en tiempo real (h, P) en la consola ----------
+    function drawLiveChart() {
+        const c = $('live-chart'); if (!c) return;
+        const W = c.clientWidth || 340, H = 140, dpr = Math.min(window.devicePixelRatio || 1, 2);
+        c.width = W * dpr; c.height = H * dpr;
+        const ctx = c.getContext('2d'); ctx.setTransform(dpr, 0, 0, dpr, 0, 0); ctx.clearRect(0, 0, W, H);
+        const s = envState(), HMAX = 3.3, h0 = currentProbeDepth;
+        const curves = [{ name: s.layer ? `${FLUIDS[s.layer.fk].name}/${FLUIDS[currentFluidKey].name}` : FLUIDS[currentFluidKey].name, color: '#38bdf8',
+            f: h => s.p0 + gaugeAt(h, s.rho, s.layer, s.g), slope: s.layer ? null : s.rho * s.g / 1000 }];
+        if (compareKey !== 'none' && !s.layer) {
+            const r2 = fluidRho(compareKey, s.T);
+            curves.push({ name: FLUIDS[compareKey].name, color: '#f59e0b', f: h => s.p0 + gaugeAt(h, r2, null, s.g), slope: r2 * s.g / 1000 });
+        }
+        const m = { l: 50, r: 10, t: 8, b: 24 }, pw = W - m.l - m.r, ph = H - m.t - m.b;
+        const yMin = s.p0; let yMax = Math.max(...curves.map(cv => cv.f(HMAX)));
+        if (yMax - yMin < 1e-6) yMax = yMin + 1;
+        yMax = yMin + (yMax - yMin) * 1.05;
+        const px = h => m.l + h / HMAX * pw, py = p => m.t + ph - (p - yMin) / (yMax - yMin) * ph;
+        const dec = (yMax - yMin) < 1 ? 3 : (yMax - yMin) < 10 ? 2 : (yMax - yMin) < 100 ? 1 : 0;
+
+        ctx.font = '10px Inter, sans-serif'; ctx.lineWidth = 1;
+        for (let i = 0; i <= 4; i++) {
+            const p = yMin + (yMax - yMin) * i / 4, yy = py(p);
+            ctx.strokeStyle = 'rgba(255,255,255,0.08)'; ctx.beginPath(); ctx.moveTo(m.l, yy); ctx.lineTo(m.l + pw, yy); ctx.stroke();
+            ctx.fillStyle = '#94a3b8'; ctx.textAlign = 'right'; ctx.fillText(p.toFixed(dec), m.l - 5, yy + 3);
+        }
+        for (let h = 0; h <= 3; h++) {
+            const xx = px(h);
+            ctx.strokeStyle = 'rgba(255,255,255,0.08)'; ctx.beginPath(); ctx.moveTo(xx, m.t); ctx.lineTo(xx, m.t + ph); ctx.stroke();
+            ctx.fillStyle = '#94a3b8'; ctx.textAlign = 'center'; ctx.fillText(h + ' m', xx, H - 8);
+        }
+        ctx.strokeStyle = '#64748b'; ctx.beginPath(); ctx.moveTo(m.l, m.t); ctx.lineTo(m.l, m.t + ph); ctx.lineTo(m.l + pw, m.t + ph); ctx.stroke();
+        ctx.fillStyle = '#64748b'; ctx.textAlign = 'left'; ctx.font = '9px Inter, sans-serif'; ctx.fillText('P (kPa)', 2, H - 8); ctx.font = '10px Inter, sans-serif';
+        if (s.layer && s.layer.t < HMAX) {
+            const xi = px(s.layer.t);
+            ctx.setLineDash([3, 3]); ctx.strokeStyle = 'rgba(165,180,252,0.8)'; ctx.beginPath(); ctx.moveTo(xi, m.t); ctx.lineTo(xi, m.t + ph); ctx.stroke(); ctx.setLineDash([]);
+            ctx.fillStyle = '#a5b4fc'; ctx.textAlign = 'left'; ctx.fillText('interfaz', xi + 3, m.t + ph - 5);
+        }
+        curves.forEach(cv => {
+            const trace = (a, b) => { ctx.beginPath(); for (let i = 0; i <= 60; i++) { const h = a + (b - a) * i / 60; i ? ctx.lineTo(px(h), py(cv.f(h))) : ctx.moveTo(px(h), py(cv.f(h))); } ctx.stroke(); };
+            ctx.strokeStyle = cv.color; ctx.globalAlpha = 0.35; ctx.lineWidth = 1.5; ctx.setLineDash([4, 3]); trace(0, HMAX);
+            ctx.globalAlpha = 1; ctx.setLineDash([]); ctx.lineWidth = 2.5; if (h0 > 0) trace(0, h0);
+            const xx = px(h0), yy = py(cv.f(h0));
+            ctx.setLineDash([2, 3]); ctx.lineWidth = 1; ctx.globalAlpha = 0.6;
+            ctx.beginPath(); ctx.moveTo(xx, yy); ctx.lineTo(xx, m.t + ph); ctx.moveTo(xx, yy); ctx.lineTo(m.l, yy); ctx.stroke();
+            ctx.setLineDash([]); ctx.globalAlpha = 1;
+            ctx.fillStyle = cv.color; ctx.beginPath(); ctx.arc(xx, yy, 4.5, 0, Math.PI * 2); ctx.fill();
+            ctx.strokeStyle = '#fff'; ctx.lineWidth = 1.5; ctx.stroke();
+        });
+        ctx.textAlign = 'left'; ctx.font = '600 10px Inter, sans-serif';
+        curves.forEach((cv, i) => {
+            const y = m.t + 14 + i * 13, x = m.l + 8;
+            ctx.fillStyle = cv.color; ctx.beginPath(); ctx.arc(x, y - 3, 3.5, 0, Math.PI * 2); ctx.fill();
+            ctx.fillStyle = '#e2e8f0'; ctx.fillText(cv.slope != null ? `${cv.name}: ${cv.slope.toFixed(2)} kPa/m` : `${cv.name} (2 capas)`, x + 8, y);
+        });
+    }
+
+    // ---------- R² y error en la interfaz (si el ruido está activo) ----------
+    function updateHudStats() {
+        const box = $('hud-fit-stats'); if (!box) return;
+        if (!$('chk-noise').checked) { box.classList.add('hidden'); return; }
+        box.classList.remove('hidden');
+        const s = envState();
+        const base = cfgKey(currentPlanetKey, currentFluidKey, s.altM, s.T, s.layer);
+        const rows = computeGroups().filter(g => g.baseKey === base);
+        let html = '<div class="text-[10px] text-slate-400 uppercase tracking-wider mb-1 font-sans">Calidad del ajuste lineal (ruido activo)</div>';
+        if (!rows.length) html += '<div class="text-slate-500 font-sans">Registra ≥ 2 lecturas con distinta h para ver R².</div>';
+        rows.forEach(g => {
+            const tag = g.seg === 'u' ? 'Capa sup.' : g.seg === 'l' ? 'Capa inf.' : 'Ajuste';
+            html += g.ok
+                ? `<div>${tag}: n=${g.n} · <span class="text-emerald-400 font-bold">R² = ${g.r2.toFixed(5)}</span> · err ρ = <span class="text-amber-400">${g.rhoErr.toFixed(2)}%</span></div>`
+                : `<div class="text-slate-500">${tag}: n=${g.n} (faltan datos)</div>`;
+        });
+        box.innerHTML = html;
+    }
+
     function updateProbeDepth() {
         currentProbeDepth = parseFloat($('slider-depth').value);
         $('label-depth-val').innerText = `${currentProbeDepth.toFixed(2)} m`;
@@ -751,15 +1048,23 @@
     function gauss() { let u = 0, v = 0; while (!u) u = Math.random(); while (!v) v = Math.random(); return Math.sqrt(-2 * Math.log(u)) * Math.cos(2 * Math.PI * v); }
 
     function recordDataPoint(silent) {
-        const planet = PLANETS[currentPlanetKey], fluid = FLUIDS[currentFluidKey];
-        const rghKPa = fluid.density * planet.g * currentProbeDepth / 1000;
-        const noise = $('chk-noise').checked ? gauss() * (0.15 + 0.004 * rghKPa) : 0;
-        const pAbs = Math.max(0, planet.p0 + rghKPa + noise);
-        recordedData.push({ h: currentProbeDepth, pAbsKPa: pAbs, pGaugeKPa: pAbs - planet.p0, planetKey: currentPlanetKey, fluidKey: currentFluidKey, ts: Date.now() });
+        const s = envState();
+        const targets = [{ fk: currentFluidKey, layer: s.layer }];
+        if (compareKey !== 'none' && !s.layer && compareKey !== currentFluidKey) targets.push({ fk: compareKey, layer: null });
+        let msg = '';
+        targets.forEach((tg, i) => {
+            const rho = fluidRho(tg.fk, s.T);
+            const rghKPa = gaugeAt(currentProbeDepth, rho, tg.layer, s.g);
+            const noise = $('chk-noise').checked ? gauss() * (0.15 + 0.004 * rghKPa) : 0;
+            const pAbs = Math.max(0, s.p0 + rghKPa + noise);
+            recordedData.push({ h: currentProbeDepth, pAbsKPa: pAbs, pGaugeKPa: pAbs - s.p0, planetKey: currentPlanetKey, fluidKey: tg.fk,
+                p0: s.p0, altM: s.altM, T: s.T, rho, layer: tg.layer ? { fk: tg.layer.fk, rho: tg.layer.rho, t: tg.layer.t } : null, ts: Date.now() });
+            if (i === 0) msg = `Dato #${recordedData.length}: h = ${currentProbeDepth.toFixed(2)} m → P = ${pAbs.toFixed(2)} kPa`;
+        });
         onDataChanged();
-        if (silent !== true) showToast(`Dato #${recordedData.length}: h = ${currentProbeDepth.toFixed(2)} m → P = ${pAbs.toFixed(2)} kPa`, 'ok');
+        if (silent !== true) showToast(msg + (targets.length > 1 ? ' (+ fluido de comparación)' : ''), 'ok');
     }
-    function removeRow(i) { recordedData.splice(i, 1); onDataChanged(); }
+        function removeRow(i) { recordedData.splice(i, 1); onDataChanged(); }
     function clearRecordedData() {
         if (recordedData.length && !confirm('¿Borrar todas las lecturas de este perfil?')) return;
         recordedData = []; onDataChanged();
@@ -768,16 +1073,17 @@
         persist();
         $('hud-count').innerText = recordedData.length;
         refreshMonitor();
+        updateHudStats();
         if (!$('analysis-modal').classList.contains('hidden')) refreshAnalysis();
     }
 
     async function autoSweep() {
         if (sweeping) return;
         sweeping = true; $('btn-sweep').disabled = true;
-        const depths = [0.4, 0.8, 1.2, 1.6, 2.0, 2.4, 2.8, 3.2];
+        const depths = layerFluidKey !== 'none' ? Array.from({ length: 16 }, (_, i) => +(0.2 * (i + 1)).toFixed(1)) : [0.4, 0.8, 1.2, 1.6, 2.0, 2.4, 2.8, 3.2];
         for (const d of depths) {
             $('slider-depth').value = d; updateProbeDepth();
-            await sleep(650);
+            await sleep(layerFluidKey !== 'none' ? 420 : 650);
             recordDataPoint(true);
         }
         sweeping = false; $('btn-sweep').disabled = false;
@@ -800,18 +1106,33 @@
     function computeGroups() {
         const map = {}, arr = [];
         recordedData.forEach(d => {
-            const k = d.planetKey + '|' + d.fluidKey;
-            if (!map[k]) { map[k] = { key: k, planetKey: d.planetKey, fluidKey: d.fluidKey, pts: [], color: PALETTE[arr.length % PALETTE.length] }; arr.push(map[k]); }
+            const lay = d.layer || null;
+            const sg = lay ? (d.h <= lay.t + 1e-9 ? 'u' : 'l') : 'f';
+            const base = cfgKey(d.planetKey, d.fluidKey, d.altM, d.T, lay), k = base + '|' + sg;
+            if (!map[k]) { map[k] = { key: k, baseKey: base, seg: sg, d0: d, pts: [], color: PALETTE[arr.length % PALETTE.length] }; arr.push(map[k]); }
             map[k].pts.push(d);
         });
         arr.forEach(g => {
-            const pl = PLANETS[g.planetKey], fl = FLUIDS[g.fluidKey];
-            g.planet = pl; g.fluid = fl; g.label = `${fl.name} · ${pl.name}`; g.n = g.pts.length;
-            g.slopeTh = fl.density * pl.g;
+            const d = g.d0, pl = PLANETS[d.planetKey], lay = d.layer;
+            g.planet = pl; g.fluid = FLUIDS[d.fluidKey];
+            g.pAtm = recP0(d);
+            g.rho = g.seg === 'u' ? lay.rho : recRho(d);
+            g.fluidLabel = (g.seg === 'u' ? FLUIDS[lay.fk].name : g.fluid.name) + (g.seg === 'u' ? ' (capa sup.)' : g.seg === 'l' ? ' (capa inf.)' : '');
+            const extra = [];
+            if (d.planetKey === 'earth' && d.altM > 0) extra.push(`${d.altM} m`);
+            if (d.T != null) extra.push(`${d.T} °C`);
+            g.label = `${g.fluidLabel} · ${pl.name}` + (extra.length ? ' ' + extra.join(' ') : '');
+            g.cond = recCond(d);
+            g.n = g.pts.length;
+            g.slopeTh = g.rho * pl.g;
+            // intercepto teórico: P0 (capa única o superior) o P0 + (ρ1−ρ2)·g·t (capa inferior)
+            g.p0Th = g.seg === 'l' ? g.pAtm + (lay.rho - g.rho) * pl.g * lay.t / 1000 : g.pAtm;
+            g.hLo = g.seg === 'l' ? lay.t : 0;
+            g.hHi = g.seg === 'u' ? lay.t : null;
             Object.assign(g, linreg(g.pts.map(p => p.h), g.pts.map(p => p.pAbsKPa * 1000)));
             if (g.ok) {
                 g.rhoExp = g.slope / pl.g;
-                g.rhoErr = Math.abs(g.rhoExp - fl.density) / fl.density * 100;
+                g.rhoErr = Math.abs(g.rhoExp - g.rho) / g.rho * 100;     // error relativo (%)
                 g.p0Exp = g.intercept / 1000;
             }
         });
@@ -841,11 +1162,11 @@
         const m = { l: 74 * fs, r: 16 * fs, t: 16 * fs, b: 50 * fs };
         const pw = W - m.l - m.r, ph = H - m.t - m.b;
         const yv = p => mode === 'abs' ? p.pAbsKPa : p.pGaugeKPa;
-        const fitY = (g, h) => mode === 'abs' ? (g.slope * h + g.intercept) / 1000 : (g.slope * h + g.intercept) / 1000 - g.planet.p0;
+        const fitY = (g, h) => mode === 'abs' ? (g.slope * h + g.intercept) / 1000 : (g.slope * h + g.intercept) / 1000 - g.pAtm;
         let maxH = 0.5, maxY = 0;
         groups.forEach(g => { g.pts.forEach(p => { maxH = Math.max(maxH, p.h); maxY = Math.max(maxY, yv(p)); }); });
         const xMax = Math.max(1, Math.ceil(maxH * 2) / 2);
-        groups.forEach(g => { if (g.ok) maxY = Math.max(maxY, fitY(g, xMax)); });
+        groups.forEach(g => { if (g.ok) maxY = Math.max(maxY, fitY(g, Math.min(g.hHi == null ? xMax : g.hHi, xMax))); });
         const yMax = niceMax(maxY * 1.06);
         const px = x => m.l + x / xMax * pw, py = y => m.t + ph - y / yMax * ph;
 
@@ -868,11 +1189,23 @@
         ctx.save(); ctx.translate(14 * fs, m.t + ph / 2); ctx.rotate(-Math.PI / 2);
         ctx.fillText(mode === 'abs' ? 'Presión absoluta P (kPa)' : 'Presión manométrica (kPa)', 0, 0); ctx.restore();
 
+        // Interfaz entre capas (si existe)
+        const drawn = {};
+        groups.forEach(g => {
+            const lay = g.d0.layer;
+            if (lay && !drawn[lay.t] && lay.t <= xMax) {
+                drawn[lay.t] = 1; ctx.save(); ctx.setLineDash([4 * fs, 4 * fs]); ctx.strokeStyle = col.axis; ctx.lineWidth = fs;
+                ctx.beginPath(); ctx.moveTo(px(lay.t), m.t); ctx.lineTo(px(lay.t), m.t + ph); ctx.stroke(); ctx.restore();
+                ctx.fillStyle = col.text; ctx.textAlign = 'left'; ctx.font = `${11 * fs}px Inter, sans-serif`; ctx.fillText('interfaz', px(lay.t) + 4 * fs, m.t + ph - 6 * fs);
+            }
+        });
         // Rectas de ajuste y puntos
         groups.forEach(g => {
             if (g.ok) {
                 ctx.strokeStyle = g.color; ctx.lineWidth = 2 * fs; ctx.setLineDash([7 * fs, 5 * fs]);
-                ctx.beginPath(); ctx.moveTo(px(0), py(fitY(g, 0))); ctx.lineTo(px(xMax), py(fitY(g, xMax))); ctx.stroke(); ctx.setLineDash([]);
+                const lo = g.hLo, hi = Math.min(g.hHi == null ? xMax : g.hHi, xMax);
+                if (hi > lo) { ctx.beginPath(); ctx.moveTo(px(lo), py(fitY(g, lo))); ctx.lineTo(px(hi), py(fitY(g, hi))); ctx.stroke(); }
+                ctx.setLineDash([]);
             }
             ctx.fillStyle = g.color;
             g.pts.forEach(p => { ctx.beginPath(); ctx.arc(px(p.h), py(yv(p)), 4.2 * fs, 0, Math.PI * 2); ctx.fill(); if (!dark) { ctx.strokeStyle = '#fff'; ctx.lineWidth = fs; ctx.stroke(); } });
@@ -955,7 +1288,7 @@
             tb.innerHTML = recordedData.map((d, i) => `
                 <tr class="hover:bg-slate-800/50">
                     <td class="p-2 text-slate-400">${i + 1}</td>
-                    <td class="p-2 font-sans text-[11px] text-slate-300">${FLUIDS[d.fluidKey].name} · ${PLANETS[d.planetKey].name}</td>
+                    <td class="p-2 font-sans text-[11px] text-slate-300">${recLabel(d)}</td>
                     <td class="p-2 text-cyan-400 font-bold">${d.h.toFixed(2)}</td>
                     <td class="p-2 text-emerald-400 font-bold">${d.pGaugeKPa.toFixed(2)}</td>
                     <td class="p-2"><button onclick="removeRow(${i})" class="text-rose-400 hover:text-rose-300" title="Eliminar"><i class="fa-solid fa-xmark"></i></button></td>
@@ -970,12 +1303,13 @@
                 <td class="p-2.5 text-cyan-400">${g.slope.toFixed(1)}</td>
                 <td class="p-2.5">${g.slopeTh.toFixed(1)}</td>
                 <td class="p-2.5 text-emerald-400">${g.rhoExp.toFixed(1)}</td>
+                <td class="p-2.5">${g.rho.toFixed(1)}</td>
                 <td class="p-2.5 text-amber-400">${g.rhoErr.toFixed(2)}</td>
                 <td class="p-2.5">${g.p0Exp.toFixed(2)}</td>
                 <td class="p-2.5">${g.r2.toFixed(5)}</td>
             </tr>` : `
-            <tr><td class="p-2.5 font-sans"><span class="inline-block w-2.5 h-2.5 rounded-full mr-2" style="background:${g.color}"></span>${g.label}</td><td class="p-2.5">${g.n}</td><td colspan="6" class="p-2.5 text-slate-500 font-sans">Se necesitan ≥ 2 lecturas con profundidades distintas</td></tr>`).join('')
-            : `<tr><td colspan="8" class="p-4 text-center text-slate-500 font-sans">Aún no hay resultados.</td></tr>`;
+            <tr><td class="p-2.5 font-sans"><span class="inline-block w-2.5 h-2.5 rounded-full mr-2" style="background:${g.color}"></span>${g.label}</td><td class="p-2.5">${g.n}</td><td colspan="7" class="p-2.5 text-slate-500 font-sans">Se necesitan ≥ 2 lecturas con profundidades distintas</td></tr>`).join('')
+            : `<tr><td colspan="9" class="p-4 text-center text-slate-500 font-sans">Aún no hay resultados.</td></tr>`;
         drawModalChart();
     }
 
@@ -1004,29 +1338,37 @@
             ['Estudiante', studentProfile.name], ['Código', studentProfile.code], ['Sección', studentProfile.section],
             ['Asignatura', studentProfile.course], ['Fecha de generación', fechaHoy()], [],
             ['Objetivo', 'Estimar experimentalmente por simulación la pendiente presión-profundidad para distintos fluidos.'],
-            ['Modelo', 'P = P0 + ρ·g·h  (pendiente = ρ·g; intercepto = P0)'],
+            ['Modelo', 'P = P0 + ρ·g·h  (pendiente = ρ·g; intercepto = P0). Con capa superior: gradiente ρ1·g hasta la interfaz y ρ2·g debajo.'],
+            ['Error relativo', '|ρ exp − ρ teórico| / ρ teórico × 100, con ρ exp = pendiente / g'],
             ['Total de lecturas', recordedData.length],
             ['Ruido de sensor activo (última sesión)', $('chk-noise').checked ? 'Sí' : 'No']
         ];
         const ws1 = XLSX.utils.aoa_to_sheet(info); ws1['!cols'] = [{ wch: 34 }, { wch: 90 }];
         XLSX.utils.book_append_sheet(wb, ws1, 'Informe');
 
-        const rows = [['N°', 'Planeta', 'g (m/s²)', 'P0 teórica (kPa)', 'Fluido', 'ρ teórica (kg/m³)', 'h (m)', 'P manométrica (kPa)', 'P absoluta medida (kPa)', 'P absoluta teórica (kPa)', 'Diferencia (kPa)']];
+        const rows = [['N°', 'Planeta', 'g (m/s²)', 'P0 atmosférica (kPa)', 'Fluido', 'ρ teórica (kg/m³)', 'h (m)', 'P manométrica (kPa)', 'P absoluta medida (kPa)', 'P absoluta teórica (kPa)', 'Diferencia (kPa)', 'Altitud (m)', 'T (°C)', 'Capa superior (espesor m)']];
         recordedData.forEach((d, i) => {
-            const pl = PLANETS[d.planetKey], fl = FLUIDS[d.fluidKey];
-            const th = pl.p0 + fl.density * pl.g * d.h / 1000;
-            rows.push([i + 1, pl.name, pl.g, pl.p0, fl.name, fl.density, +d.h.toFixed(3), +d.pGaugeKPa.toFixed(4), +d.pAbsKPa.toFixed(4), +th.toFixed(4), +(d.pAbsKPa - th).toFixed(4)]);
+            const pl = PLANETS[d.planetKey], p0 = recP0(d), th = p0 + gaugeAt(d.h, recRho(d), d.layer, pl.g);
+            rows.push([i + 1, pl.name, pl.g, +p0.toFixed(3), recFluidTxt(d),
+                d.layer ? `${d.layer.rho.toFixed(1)} (sup) / ${recRho(d).toFixed(1)} (inf)` : +recRho(d).toFixed(2),
+                +d.h.toFixed(3), +d.pGaugeKPa.toFixed(4), +d.pAbsKPa.toFixed(4), +th.toFixed(4), +(d.pAbsKPa - th).toFixed(4),
+                d.planetKey === 'earth' ? (d.altM || 0) : 'n/a', d.T != null ? d.T : 'nominal 20', d.layer ? `${FLUIDS[d.layer.fk].name} (${d.layer.t} m)` : '—']);
         });
         const ws2 = XLSX.utils.aoa_to_sheet(rows);
-        ws2['!cols'] = [6, 12, 10, 16, 20, 18, 9, 20, 22, 22, 16].map(w => ({ wch: w }));
+        ws2['!cols'] = [6, 12, 10, 18, 30, 24, 9, 20, 22, 22, 16, 12, 12, 24].map(w => ({ wch: w }));
         XLSX.utils.book_append_sheet(wb, ws2, 'Datos');
 
-        const reg = [['Fluido', 'Planeta', 'n', 'Pendiente exp. (Pa/m)', 'ρ·g teórica (Pa/m)', 'ρ exp. (kg/m³)', 'ρ teórica (kg/m³)', 'Error ρ (%)', 'P0 exp. (kPa)', 'P0 teórica (kPa)', 'R²']];
-        groups.forEach(g => {
-            reg.push(g.ok ? [g.fluid.name, g.planet.name, g.n, +g.slope.toFixed(2), +g.slopeTh.toFixed(2), +g.rhoExp.toFixed(2), g.fluid.density, +g.rhoErr.toFixed(3), +g.p0Exp.toFixed(3), g.planet.p0, +g.r2.toFixed(6)]
-                : [g.fluid.name, g.planet.name, g.n, 'n/d', +g.slopeTh.toFixed(2), 'n/d', g.fluid.density, 'n/d', 'n/d', g.planet.p0, 'n/d']);
+        // Hoja de regresiones: la columna "Error relativo ρ (%)" es una fórmula de Excel
+        const reg = [['Fluido', 'Planeta', 'Condiciones', 'n', 'Pendiente exp. (Pa/m)', 'ρ·g teórica (Pa/m)', 'ρ exp. (kg/m³)', 'ρ teórica (kg/m³)', 'Error relativo ρ (%)', 'P0 exp. (kPa)', 'P0 teórica (kPa)', 'R²']];
+        groups.forEach((g, i) => {
+            const r = i + 2;
+            reg.push(g.ok
+                ? [g.fluidLabel, g.planet.name, g.cond || '—', g.n, +g.slope.toFixed(2), +g.slopeTh.toFixed(2), +g.rhoExp.toFixed(2), +g.rho.toFixed(2),
+                   { t: 'n', f: `ABS(G${r}-H${r})/H${r}*100`, v: +g.rhoErr.toFixed(4), z: '0.000' }, +g.p0Exp.toFixed(3), +g.p0Th.toFixed(3), +g.r2.toFixed(6)]
+                : [g.fluidLabel, g.planet.name, g.cond || '—', g.n, 'n/d', +g.slopeTh.toFixed(2), 'n/d', +g.rho.toFixed(2), 'n/d', 'n/d', +g.p0Th.toFixed(3), 'n/d']);
         });
-        const ws3 = XLSX.utils.aoa_to_sheet(reg); ws3['!cols'] = [20, 12, 6, 22, 20, 16, 18, 12, 14, 16, 10].map(w => ({ wch: w }));
+        const ws3 = XLSX.utils.aoa_to_sheet(reg); ws3['!cols'] = [30, 12, 26, 6, 22, 20, 16, 18, 20, 14, 16, 10].map(w => ({ wch: w }));
+        XLSX.utils.sheet_add_aoa(ws3, [[], ['Error relativo (%) = |ρ exp − ρ teórico| / ρ teórico × 100   ·   ρ exp = pendiente / g']], { origin: -1 });
         XLSX.utils.book_append_sheet(wb, ws3, 'Regresiones');
 
         XLSX.writeFile(wb, `Reporte_Hidrostatica_${studentProfile.code}.xlsx`);
@@ -1068,22 +1410,27 @@
 
         h2('2. Registro de datos experimentales');
         doc.autoTable({
-            startY: y, theme: 'striped', styles: { fontSize: 8, cellPadding: 1.6 }, headStyles: { fillColor: [2, 132, 199] },
-            head: [['#', 'Planeta', 'g (m/s²)', 'Fluido', 'h (m)', 'P man (kPa)', 'P abs (kPa)']],
-            body: recordedData.map((d, i) => [i + 1, PLANETS[d.planetKey].name, PLANETS[d.planetKey].g, FLUIDS[d.fluidKey].name, d.h.toFixed(2), d.pGaugeKPa.toFixed(3), d.pAbsKPa.toFixed(3)])
+            startY: y, theme: 'striped', styles: { fontSize: 7.5, cellPadding: 1.5 }, headStyles: { fillColor: [2, 132, 199] },
+            head: [['#', 'Planeta (g)', 'Fluido', 'Condiciones', 'h (m)', 'P man (kPa)', 'P abs (kPa)']],
+            body: recordedData.map((d, i) => [i + 1, `${PLANETS[d.planetKey].name} (${PLANETS[d.planetKey].g})`, recFluidTxt(d), recCond(d) || '-', d.h.toFixed(2), d.pGaugeKPa.toFixed(3), d.pAbsKPa.toFixed(3)])
         });
         y = doc.lastAutoTable.finalY + 9;
 
         h2('3. Regresiones lineales y comparación de pendientes');
         ensure(30);
         doc.autoTable({
-            startY: y, theme: 'grid', styles: { fontSize: 8, cellPadding: 1.8 }, headStyles: { fillColor: [16, 185, 129] },
-            head: [['Fluido - Planeta', 'n', 'Pend. exp. (Pa/m)', 'rho·g teór. (Pa/m)', 'rho exp. (kg/m³)', 'Error (%)', 'P0 exp. (kPa)', 'R²']],
+            startY: y, theme: 'grid', styles: { fontSize: 7.5, cellPadding: 1.6 }, headStyles: { fillColor: [16, 185, 129] },
+            head: [['Fluido - Planeta', 'n', 'Pend. exp. (Pa/m)', 'rho·g teór. (Pa/m)', 'rho exp.', 'rho teór.', 'Error rel. (%)', 'P0 exp. (kPa)', 'R²']],
             body: groups.map(g => g.ok
-                ? [g.label.replace('·', '-'), g.n, g.slope.toFixed(1), g.slopeTh.toFixed(1), g.rhoExp.toFixed(1), g.rhoErr.toFixed(2), g.p0Exp.toFixed(2), g.r2.toFixed(5)]
-                : [g.label.replace('·', '-'), g.n, 'n/d', g.slopeTh.toFixed(1), 'n/d', 'n/d', 'n/d', 'n/d'])
+                ? [g.label.replace('·', '-'), g.n, g.slope.toFixed(1), g.slopeTh.toFixed(1), g.rhoExp.toFixed(1), g.rho.toFixed(1), g.rhoErr.toFixed(2), g.p0Exp.toFixed(2), g.r2.toFixed(5)]
+                : [g.label.replace('·', '-'), g.n, 'n/d', g.slopeTh.toFixed(1), 'n/d', g.rho.toFixed(1), 'n/d', 'n/d', 'n/d'])
         });
-        y = doc.lastAutoTable.finalY + 9;
+        y = doc.lastAutoTable.finalY + 6;
+        ensure(16);
+        doc.setFont('helvetica', 'italic'); doc.setFontSize(9); doc.setTextColor(30, 41, 59);
+        doc.text('Error relativo (%) = | rho_exp - rho_teorico | / rho_teorico x 100      con rho_exp = pendiente / g', mx, y); y += 5;
+        doc.text('R² cercano a 1 indica que la relación presión-profundidad es lineal (buen ajuste, aun con ruido de sensor).', mx, y); y += 9;
+        doc.setFont('helvetica', 'normal');
 
         h2('4. Gráfica P vs h');
         ensure(95);
@@ -1732,6 +2079,7 @@
     }
 
     function onWindowResize() {
+        drawLiveChart();
         camera.aspect = window.innerWidth / window.innerHeight; camera.updateProjectionMatrix();
         renderer.setSize(window.innerWidth, window.innerHeight);
         if (!$('analysis-modal').classList.contains('hidden')) drawModalChart();
